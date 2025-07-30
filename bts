@@ -1,0 +1,194 @@
+
+-----------------------------------------------------------------------------------------------------------------------
+  GObject-Introspection:
+-----------------------------------------------------------------------------------------------------------------------
+    Description:
+      GNOME middleware layer between C libraries and language bindings
+
+     Versions:
+        GObject-Introspection/1.72.0-cpeAMD-22.08-cray-python3.9
+        GObject-Introspection/1.72.0-cpeAOCC-22.08-cray-python3.9
+        GObject-Introspection/1.72.0-cpeCray-22.08-cray-python3.9
+        GObject-Introspection/1.72.0-cpeGNU-22.08-cray-python3.9
+        GObject-Introspection/1.74.0-cpeAMD-22.12-cray-python3.9
+        GObject-Introspection/1.74.0-cpeAOCC-22.12-cray-python3.9
+        GObject-Introspection/1.74.0-cpeCray-22.12-cray-python3.9
+        GObject-Introspection/1.74.0-cpeCray-23.03-cray-python3.9
+        GObject-Introspection/1.74.0-cpeGNU-22.12-cray-python3.9
+        GObject-Introspection/1.76.1-cpeAMD-23.09-cray-python3.10
+        GObject-Introspection/1.76.1-cpeAMD-23.12-cray-python3.11
+        GObject-Introspection/1.76.1-cpeAOCC-23.09-cray-python3.10
+        GObject-Introspection/1.76.1-cpeAOCC-23.12-cray-python3.11
+        GObject-Introspection/1.76.1-cpeCray-23.09-cray-python3.10
+        GObject-Introspection/1.76.1-cpeCray-23.12-cray-python3.11
+        GObject-Introspection/1.76.1-cpeGNU-23.09-cray-python3.10
+        GObject-Introspection/1.76.1-cpeGNU-23.12-cray-python3.11
+        GObject-Introspection/1.78.1-cpeAMD-24.03-cray-python3.11
+        GObject-Introspection/1.78.1-cpeAOCC-24.03-cray-python3.11
+        GObject-Introspection/1.78.1-cpeCray-24.03-cray-python3.11
+        GObject-Introspection/1.78.1-cpeGNU-24.03-cray-python3.11
+
+-----------------------------------------------------------------------------------------------------------------------
+  For detailed information about a specific "GObject-Introspection" package (including how to load the modules) use the module's full name.
+  Note that names that have a trailing (E) are extensions provided by other modules.
+  For example:
+
+     $ module spider GObject-Introspection/1.78.1-cpeGNU-24.03-cray-python3.11
+-----------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------------------
+  buildtools: buildtools/22.08-noPython
+-----------------------------------------------------------------------------------------------------------------------
+    Description:
+      A bundle of often used build tools, GNU and othersContains: åutoconf, Autoconf_archive, Automake, makeinfo,
+      libtool, M4, make, sed, Bison, flex, Berkeley Yacc (byacc), CMake, Ninja, NASM, Yasm, patchelf, gperf, re2c,
+      help2man, Doxygen and xxd
+
+
+    You will need to load all module(s) on any one of the lines below before the "buildtools/22.08-noPython" module is available to load.
+
+      CrayEnv
+      LUMI/22.08  partition/C
+      LUMI/22.08  partition/G
+      LUMI/22.08  partition/L
+ 
+    This module provides the following extensions:
+
+       [1;34mAutoconf/2.71[0m (E), [1;34mAutoconf-archive/2022.02.11[0m (E), [1;34mAutomake/1.16.5[0m (E), [1;34mmakeinfo/6.8[0m (E), [1;34mlibtool/2.4.6[0m (E), [1;34mM4/1.4.19[0m (E), [1;34mmake/4.3[0m (E), [1;34msec/4.8[0m (E), [1;34mBison/3.8.2[0m (E), [1;34mflex/2.6.4[0m (E), [1;34mbyacc/20220128[0m (E), [1;34mCMake/3.24.0[0m (E), [1;34mNinja/1.11.0[0m (E), [1;34mNASM/2.15.05[0m (E), [1;34mYasm/1.3.0[0m (E), [1;34mpatchelf/0.15.0[0m (E), [1;34mre2c/3.0[0m (E), [1;34mgperf/3.1[0m (E), [1;34mhelp2man/1.49.2[0m (E), [1;34mDoxygen/1.9.4[0m (E), [1;34mxxd/9.0.0193[0m (E)
+
+    Help:
+      Description
+      ===========
+      This bundle collects a number of standard tools that are often needed when
+      building software. Many of them are GNU tools.
+      + GNU Autoconf 2.71               - https://www.gnu.org/software/autoconf/
+      + GNU Autoconf Archive 2022.02.11 - https://www.gnu.org/software/autoconf/
+      + GNU Automake 1.16.5             - https://www.gnu.org/software/automake/
+      + GNU makeinfo 6.8                - https://www.gnu.org/software/texinfo/
+      + GNU libtool 2.4.6               - https://www.gnu.org/software/libtool/
+      + GNU M4 1.4.19                   - https://www.gnu.org/software/m4/
+      + GNU make 4.3                    - https://www.gnu.org/software/make/
+      + GNU sed 4.8                     - https://www.gnu.org/software/sed/
+      + GNU Bison 3.8.2                 - https://www.gnu.org/software/bison
+      + GNU flex 2.6.4                  - https://www.gnu.org/software/flex/
+      + byacc 20220128                  - http://invisible-island.net/byacc/byacc.html
+      + CMake 3.24.0                    - http://www.cmake.org/
+      + Ninja 1.11.0                    - https://ninja-build.org/
+      + NASM 2.15.05                    - http://www.nasm.us/
+      + Yasm 1.3.0                      - http://yasm.tortall.net/
+      + patchelf 0.15.0                 - Modify the dynamic linker and RPATH of ELF executables,
+                                          http://nixos.org/patchelf.html
+      + re2c 3.0                        - http://re2c.org/
+      + GNU gperf 3.1                   - https://www.gnu.org/software/gperf/
+      + GNU help2man 1.49.2             - https://www.gnu.org/software/help2man/
+      + Doxygen 1.9.4                   - http://www.doxygen.org/
+      + xxd 9.0.0193                    - https://www.vim.org
+      These tools are all build against the system libraries and have been used to
+      build several of the 22.08 packages.
+      
+      Compared to the regular buildtools module it leaves out Meson and SCons which
+      are both Python-code that is not properly wrapped and can interfer with other
+      Python code that requires a different version of Python.
+      
+      Note that makeinfo is not fully functional as there is no TeX on the system.
+      
+      
+      More information
+      ================
+       - Homepage: http://www.gnu.org
+       - Site contact: LUMI User Support @ https://lumi-supercomputer.eu/user-support/need-help/
+      
+
+
+-----------------------------------------------------------------------------------------------------------------------
+  buildtools-python:
+-----------------------------------------------------------------------------------------------------------------------
+    Description:
+      An addition to buildtools with tools that require Python.Contains: Meson, SCons, using the Python provided by
+      the OS
+
+     Versions:
+        buildtools-python/22.12-systemPython
+        buildtools-python/23.03-systemPython
+        buildtools-python/23.09-cray-python3.10
+        buildtools-python/23.09-systemPython
+        buildtools-python/23.12-cray-python3.11
+        buildtools-python/23.12-systemPython
+        buildtools-python/24.03-cray-python3.11
+        buildtools-python/24.03-systemPython
+
+-----------------------------------------------------------------------------------------------------------------------
+  For detailed information about a specific "buildtools-python" package (including how to load the modules) use the module's full name.
+  Note that names that have a trailing (E) are extensions provided by other modules.
+  For example:
+
+     $ module spider buildtools-python/24.03-systemPython
+-----------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------------------
+  cotainr:
+-----------------------------------------------------------------------------------------------------------------------
+    Description:
+      cotainr is a tool that helps making Singularity/Apptainer containers.
+
+     Versions:
+        cotainr/2023.01.0-cray-python-3.9.12.1
+        cotainr/2023.01.0
+        cotainr/2023.11.0-cray-python-3.9.13.1
+        cotainr/2023.11.0-20240529-AIcourse-cray-python-3.10.10
+        cotainr/2023.11.0-20240529-AIcourse
+        cotainr/2023.11.0-20240909-cray-python-3.11.7
+        cotainr/2023.11.0-20240909
+
+-----------------------------------------------------------------------------------------------------------------------
+  For detailed information about a specific "cotainr" package (including how to load the modules) use the module's full name.
+  Note that names that have a trailing (E) are extensions provided by other modules.
+  For example:
+
+     $ module spider cotainr/2023.11.0-20240909
+-----------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------------------
+  cray-python:
+-----------------------------------------------------------------------------------------------------------------------
+     Versions:
+        cray-python/3.9.12.1
+        cray-python/3.9.13.1
+        cray-python/3.10.10
+        cray-python/3.11.5
+        cray-python/3.11.7
+
+-----------------------------------------------------------------------------------------------------------------------
+  For detailed information about a specific "cray-python" package (including how to load the modules) use the module's full name.
+  Note that names that have a trailing (E) are extensions provided by other modules.
+  For example:
+
+     $ module spider cray-python/3.11.7
+-----------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------------------
+  lumi-container-wrapper:
+-----------------------------------------------------------------------------------------------------------------------
+    Description:
+      Tool for wrapping a software environment in an Apptainer/Singularity containerm, also know as tykky.
+
+     Versions:
+        lumi-container-wrapper/0.2.6-cray-python-default
+        lumi-container-wrapper/0.2.6-cray-python-3.9.12.1
+        lumi-container-wrapper/0.3.1-cray-python-default
+        lumi-container-wrapper/0.3.1-cray-python-3.9.12.1
+        lumi-container-wrapper/0.3.1-cray-python-3.9.13.1
+        lumi-container-wrapper/0.3.1-cray-python-3.10.10
+        lumi-container-wrapper/0.3.3-cray-python-default
+        lumi-container-wrapper/0.3.3-cray-python-3.11.5
+        lumi-container-wrapper/0.3.3-cray-python-3.11.7
+        lumi-container-wrapper/0.4.2-cray-python-default
+        lumi-container-wrapper/0.4.2-cray-python-3.11.7
+
+-----------------------------------------------------------------------------------------------------------------------
+  For detailed information about a specific "lumi-container-wrapper" package (including how to load the modules) use the module's full name.
+  Note that names that have a trailing (E) are extensions provided by other modules.
+  For example:
+
+     $ module spider lumi-container-wrapper/0.4.2-cray-python-3.11.7
+-----------------------------------------------------------------------------------------------------------------------
