@@ -1,9 +1,11 @@
 #!/bin/bash
 # AQ_Net2 Project - Main execution script
+echo "DEBUG: Script started at $(date)"
 
 echo "AQ_Net2 Project - Starting training..."
 
 # Activate virtual environment
+echo "DEBUG: After venv activation"
 source venv_pytorch_rocm/bin/activate
 export PYTHONUNBUFFERED=1
 export PYTHONPATH=/scratch/project_462000640/ammar/aq_net2:$PYTHONPATH
@@ -27,4 +29,4 @@ ps aux | grep $USER | grep python | grep -v grep || echo "No concurrent Python p
 
 # Launch main training script
 echo "Starting main training..."
-venv_pytorch_rocm/bin/python main.py --config configs/config.yaml
+venv_pytorch_rocm/bin/python src/train.py

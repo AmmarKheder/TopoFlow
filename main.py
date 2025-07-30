@@ -45,8 +45,7 @@ def create_datasets(config):
         years=data_config['train_years'],
         variables=data_config['variables'],
         target_variables=data_config['target_variables'],
-        time_history=data_config['time_history'],
-        time_future=data_config['time_future'],
+        lead_times_hours=data_config['lead_times_hours'],
         normalize=data_config['normalize'],
         target_resolution=data_config['target_resolution']
     )
@@ -58,8 +57,7 @@ def create_datasets(config):
         years=data_config['val_years'],
         variables=data_config['variables'],
         target_variables=data_config['target_variables'],
-        time_history=data_config['time_history'],
-        time_future=data_config['time_future'],
+        lead_times_hours=data_config['lead_times_hours'],
         normalize=data_config['normalize'],
         target_resolution=data_config['target_resolution']
     )
@@ -71,8 +69,7 @@ def create_datasets(config):
         years=data_config['test_years'],
         variables=data_config['variables'],
         target_variables=data_config['target_variables'],
-        time_history=data_config['time_history'],
-        time_future=data_config['time_future'],
+        lead_times_hours=data_config['lead_times_hours'],
         normalize=data_config['normalize'],
         target_resolution=data_config['target_resolution']
     )

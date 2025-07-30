@@ -77,7 +77,7 @@ class PM25Model(nn.Module):
     def forward(self, x, lead_times):
         B,C,H,W = x.shape
         device = x.device
-        lt = torch.tensor(lead_times, device=device)
+        lt = torch.tensor(lead_times, dtype=torch.float32, device=device)
         feats = checkpoint(self.climax.module.forward_encoder, x, lt, self.variables) if hasattr(self.climax, "module") else checkpoint(self.climax.forward_encoder, x, lt, self.variables)
         for blk in (self.climax.module.blocks if hasattr(self.climax, "module") else self.climax.blocks):
             feats = blk(feats)

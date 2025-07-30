@@ -1,123 +1,173 @@
-import time
-import numpy as np
 import torch
 import torch.nn as nn
+import numpy as np
+import time
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import os
+from collections import defaultdict
 
 def evaluate(model, loader, device):
     print("Evaluating...")
     model.eval()
-    all_pred, all_true = [], []
+    all_predictions = []  # Store (pred, true, lead_time) tuples
     eval_start = time.time()
     
     with torch.no_grad():
         for batch_idx, (X, y, lead_times) in enumerate(loader):
-            X = X.to(device)  # Shape should be (B, C, H, W)
-            if len(X.shape) == 3:
-                X = X.unsqueeze(1)  # Add channel dim if missing  # Use only last timestep
+            X = X.to(device)
             y = y.to(device)
-            lead_times = torch.tensor(lead_times).to(device)
+            lead_times = torch.tensor(lead_times, dtype=torch.float32).to(device)
+            
             pred = model(X, lead_times)
-            all_pred.append(pred.cpu().numpy().ravel())
-            all_true.append(y.cpu().numpy().ravel())
+            
+            # Store predictions with their lead times
+            for i in range(len(pred)):
+                all_predictions.append((
+                    pred[i].cpu().numpy().ravel(),
+                    y[i].cpu().numpy().ravel(), 
+                    float(lead_times[i])
+                ))
             
             if batch_idx % 20 == 0 and batch_idx > 0:
-                print(f"Batch {batch_idx}/{len(loader)} evaluated...")
+                print(f"   Batch {batch_idx}/{len(loader)}")
     
-    y_pred = np.concatenate(all_pred)
-    y_true = np.concatenate(all_true)
+    # Group by lead time
+    by_lead_time = defaultdict(lambda: {'pred': [], 'true': []})
+    for pred, true, lt in all_predictions:
+        by_lead_time[lt]['pred'].extend(pred)
+        by_lead_time[lt]['true'].extend(true)
+    
     eval_time = time.time() - eval_start
+    print(f"Evaluation results ({eval_time:.1f}s):")
     
-    metrics = {
-        'mae': mean_absolute_error(y_true, y_pred),
-        'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
-        'r2':   r2_score(y_true, y_pred)
-    }
+    all_metrics = {}
+    for lead_time in sorted(by_lead_time.keys()):
+        y_pred = np.array(by_lead_time[lead_time]['pred'])
+        y_true = np.array(by_lead_time[lead_time]['true'])
+        
+        mae = mean_absolute_error(y_true, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+        r2 = r2_score(y_true, y_pred)
+        
+        all_metrics[f'{int(lead_time/24)}d'] = {'mae': mae, 'rmse': rmse, 'r2': r2}
+        print(f"   {int(lead_time/24):2d} day:  RMSE={rmse:6.2f}  MAE={mae:6.2f}  R2={r2:6.3f}  (n={len(y_pred):,})")
     
-    print(f"Evaluation finished in {eval_time:.2f}s ({len(y_pred):,} predictions)")
-    return metrics
+    # Overall metrics
+    all_pred = np.concatenate([np.array(by_lead_time[lt]['pred']) for lt in by_lead_time])
+    all_true = np.concatenate([np.array(by_lead_time[lt]['true']) for lt in by_lead_time])
+    overall_rmse = np.sqrt(mean_squared_error(all_true, all_pred))
+    
+    print(f"   Overall: RMSE={overall_rmse:6.2f}")
+    return overall_rmse, all_metrics
 
-def train(config, model, train_loader, val_loader, device):
-    print("Starting training...")
-    optimizer = torch.optim.Adam(model.head.parameters(), lr=config['train']['learning_rate'])
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
+def train_epoch(model, loader, optimizer, criterion, device, epoch):
+    model.train()
+    total_loss = 0
+    start_time = time.time()
+    
+    for batch_idx, (X, y, lead_times) in enumerate(loader):
+        X = X.to(device)
+        y = y.to(device) 
+        lead_times = torch.tensor(lead_times, dtype=torch.float32).to(device)
+        
+        optimizer.zero_grad()
+        pred = model(X, lead_times)
+        loss = criterion(pred, y)
+        loss.backward()
+        optimizer.step()
+        
+        total_loss += loss.item()
+        
+        if batch_idx % 50 == 0 and batch_idx > 0:
+            elapsed = time.time() - start_time
+            print(f"   Epoch {epoch}, Batch {batch_idx}/{len(loader)}, Loss: {loss.item():.4f}, Time: {elapsed:.1f}s")
+    
+    return total_loss / len(loader)
+
+def main():
+    from config_manager import ConfigManager
+    from dataloader import CAQRADataset
+    from model import PM25Model
+    
+    print("Starting AQ_Net2 Training")
+    
+    # Load config
+    config = ConfigManager("configs/config.yaml")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    # Create datasets
+    print("Loading datasets...")
+    train_dataset = CAQRADataset(
+        data_path=config.data_path,
+        years=config.train_years,
+        variables=config.input_variables,
+        target_variables=config.target_variables,
+        lead_times_hours=config.lead_times_hours,
+        normalize=config.normalize,
+        target_resolution=config.target_resolution
+    )
+    
+    val_dataset = CAQRADataset(
+        data_path=config.data_path,
+        years=config.val_years,
+        variables=config.input_variables,
+        target_variables=config.target_variables,
+        lead_times_hours=config.lead_times_hours,
+        normalize=config.normalize,
+        target_resolution=config.target_resolution
+    )
+    
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=4)
+    
+    # Create model
+    print("Creating model...")
+    model = PM25Model(
+        config=config.config,
+        device=device
+    ).to(device)
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
     criterion = nn.MSELoss()
-
-    best_rmse, no_improve = float('inf'), 0
-    total_train_time = 0
-
-    for epoch in range(1, config['train']['epochs'] + 1):
-        epoch_start = time.time()
-        print(f"\nEpoch {epoch}/{config['train']['epochs']}")
+    scheduler = ReduceLROnPlateau(optimizer, patience=3, factor=0.5, verbose=True)
+    
+    print(f"Training for {config.num_epochs} epochs")
+    print(f"   Train samples: {len(train_dataset):,}")
+    print(f"   Val samples: {len(val_dataset):,}")
+    
+    best_val_loss = float('inf')
+    
+    for epoch in range(config.num_epochs):
+        print(f"\n=== Epoch {epoch+1}/{config.num_epochs} ===")
         
-        # Training phase
-        print("Training phase...")
-        model.train()
-        train_loss = 0.0
-        num_batches = 0
+        # Train
+        train_loss = train_epoch(model, train_loader, optimizer, criterion, device, epoch+1)
+        print(f"Train Loss: {train_loss:.4f}")
         
-        for batch_idx, (X, y, lead_times) in enumerate(train_loader):
-            X = X.to(device)  # Shape should be (B, C, H, W)
-            if len(X.shape) == 3:
-                X = X.unsqueeze(1)  # Add channel dim if missing  # Use only last timestep
-            y = y.to(device)
-            lead_times = torch.tensor(lead_times).to(device)
-            
-            optimizer.zero_grad()
-            loss = criterion(model(X, lead_times), y)
-            loss.backward()
-            optimizer.step()
-            
-            train_loss += loss.item()
-            num_batches += 1
-            
-            if batch_idx % 50 == 0 and batch_idx > 0:
-                print(f"Batch {batch_idx}/{len(train_loader)}, Loss: {loss.item():.6f}")
-
-        avg_train_loss = train_loss / num_batches
-        print(f"Training finished - Average loss: {avg_train_loss:.6f}")
-
-        # Validation phase
-        print("Validation phase...")
-        metrics = evaluate(model, val_loader, device)
+        # Validate
+        val_loss, metrics = evaluate(model, val_loader, device)
+        scheduler.step(val_loss)
         
-        epoch_time = time.time() - epoch_start
-        total_train_time += epoch_time
+        # Save best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), 'checkpoints/best_model.pth')
+            print(f"New best model saved (RMSE: {val_loss:.4f})")
         
-        print(f"Epoch {epoch} results:")
-        print(f"Train Loss: {avg_train_loss:.6f}")
-        print(f"Val RMSE:   {metrics['rmse']:.4f}")
-        print(f"Val MAE:    {metrics['mae']:.4f}")
-        print(f"Val R²:     {metrics['r2']:.4f}")
-        print(f"Time:       {epoch_time:.1f}s")
-        print(f"Current LR: {optimizer.param_groups[0]['lr']:.2e}")
+        # Save checkpoint
+        if (epoch + 1) % 5 == 0:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'val_loss': val_loss,
+                'metrics': metrics
+            }, f'checkpoints/checkpoint_epoch_{epoch+1}.pth')
+    
+    print(f"\nTraining completed! Best validation RMSE: {best_val_loss:.4f}")
 
-        # Scheduler & early stopping
-        old_lr = optimizer.param_groups[0]['lr']
-        scheduler.step(metrics['rmse'])
-        new_lr = optimizer.param_groups[0]['lr']
-        
-        if new_lr < old_lr:
-            print(f"Learning rate reduced: {old_lr:.2e} -> {new_lr:.2e}")
-        
-        if metrics['rmse'] < best_rmse:
-            best_rmse, no_improve = metrics['rmse'], 0
-            torch.save(model.state_dict(), 'outputs/checkpoints/best_model.pt')
-            print(f"New best model saved! RMSE: {best_rmse:.4f}")
-        else:
-            no_improve += 1
-            print(f"No improvement ({no_improve}/{config['train']['patience']})")
-            
-            if no_improve >= config['train']['patience']:
-                print(f"\nEarly stopping triggered after {epoch} epochs")
-                print(f"Best RMSE: {best_rmse:.4f}")
-                break
-
-    print("\nTraining finished.")
-    print(f"Total training time: {total_train_time/60:.1f} minutes")
-    print(f"Best validation RMSE: {best_rmse:.4f}")
-    return best_rmse
-
+if __name__ == "__main__":
+    main()
