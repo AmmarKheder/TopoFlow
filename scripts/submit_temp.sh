@@ -7,6 +7,7 @@
 #SBATCH --cpus-per-task=7
 #SBATCH --gpus-per-node=4
 #SBATCH --mem=180G
+#SBATCH --exclude=nid[007878,007904-007905]
 #SBATCH --time=72:00:00
 #SBATCH --output=logs/aq_net2_train_%j.out
 #SBATCH --error=logs/aq_net2_train_%j.err

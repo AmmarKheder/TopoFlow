@@ -17,13 +17,31 @@ export HIP_VISIBLE_DEVICES=0,1,2,3
 export PYTORCH_HIP_ALLOC_CONF=expandable_segments:False
 export HSA_FORCE_FINE_GRAIN_PCIE=1
 
-# Force GLOO backend instead of NCCL for DataParallel
+# FORCE DISABLE RCCL/NCCL COMPLETELY
+export NCCL_SOCKET_IFNAME=lo
+export NCCL_IB_DISABLE=1
+export RCCL_IB_DISABLE=1
+export TORCH_NCCL_ENABLE_MONITORING=0
+export TORCH_NCCL_BLOCKING_WAIT=0
 export TORCH_DISTRIBUTED_BACKEND=gloo
 export USE_GLOO=1
-
-# Disable NCCL
 export USE_NCCL=0
-export NCCL_DEBUG=WARN
+export USE_RCCL=0
+export NCCL_DEBUG=OFF
+export RCCL_DEBUG=OFF
+
+# Disable any distributed initialization
+export RANK=-1
+export WORLD_SIZE=1
+export MASTER_ADDR=""
+export MASTER_PORT=""
+# # Force GLOO backend instead of NCCL for DataParallel
+# export TORCH_DISTRIBUTED_BACKEND=gloo
+# export USE_GLOO=1
+# 
+# # Disable NCCL
+# export USE_NCCL=0
+# export NCCL_DEBUG=WARN
 
 # MIOpen cache
 export MIOPEN_USER_DB_PATH=/tmp/${USER}-miopen-cache-${SLURM_JOB_ID}
@@ -51,4 +69,4 @@ ps aux | grep $USER | grep python | grep -v grep || echo "No concurrent Python p
 
 # Launch main training script
 echo "Starting main training..."
-venv_pytorch_rocm/bin/python src/train.py
+venv_pytorch_rocm/bin/python src/train.py "$@"

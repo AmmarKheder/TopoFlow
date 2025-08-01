@@ -10,6 +10,7 @@
 #SBATCH --time=72:00:00
 #SBATCH --output=logs/aq_net2_train_%j.out
 #SBATCH --error=logs/aq_net2_train_%j.err
+#SBATCH --exclude=nid[007878,007904-007905]
 
 module purge
 module load LUMI/24.03

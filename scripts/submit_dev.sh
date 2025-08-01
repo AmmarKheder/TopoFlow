@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=aq_net2_train
 #SBATCH --account=project_462000640
-#SBATCH --partition=small-g
+#SBATCH --partition=dev-g
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=7
-#SBATCH --gpus-per-node=4
+#SBATCH --gpus-per-node=8
 #SBATCH --mem=180G
-#SBATCH --time=72:00:00
+#SBATCH --time=3:00:00
 #SBATCH --output=logs/aq_net2_train_%j.out
 #SBATCH --error=logs/aq_net2_train_%j.err
 
