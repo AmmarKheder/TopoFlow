@@ -2,8 +2,8 @@
 #SBATCH --job-name=rmse_72h_2018
 #SBATCH --account=project_462000640
 #SBATCH --partition=small-g
-#SBATCH --nodes=4
-#SBATCH --ntasks=4
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=7
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=60G
@@ -19,8 +19,8 @@ module load rocm/6.0.3
 echo "=========================================="
 echo "🚀 ÉVALUATION RMSE - MAX POWER!"
 echo "Job ID: $SLURM_JOB_ID"
-echo "GPUs: 4 (1 par nœud)"
-echo "Nodes: 4"
+echo "GPUs: 1"
+echo "Nodes: 1"
 echo "Partition: small-g"
 echo "💪 MAX POWER SMALL-G"
 echo "Date: $(date)"
@@ -42,8 +42,8 @@ mkdir -p ${MIOPEN_USER_DB_PATH}
 
 mkdir -p results
 
-echo "🔥 Lancement évaluation RMSE MAX POWER (4 GPUs, 4 nœuds)..."
+echo "🔥 Lancement évaluation RMSE MAX POWER (1 GPU, 4K échantillons)..."
 
-/scratch/project_462000640/ammar/aq_net2/venv_pytorch_rocm/bin/python evaluation/eval_rmse_simple.py
+/scratch/project_462000640/ammar/aq_net2/venv_pytorch_rocm/bin/python evaluation/eval_baseline_complete.py
 
 echo "✅ TERMINÉ avec MAX POWER: $(date)"

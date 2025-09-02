@@ -17,7 +17,7 @@ class ConfigManager:
     def _validate_config(self):
         required_keys = [
             ('data', 'time_step'),
-            ('data', 'forecast_days'),
+            ('data', 'forecast_hours'),
             ('train', 'epochs'),
             ('train', 'batch_size')
         ]
@@ -26,20 +26,20 @@ class ConfigManager:
             if section not in self.config or key not in self.config[section]:
                 raise ValueError(f"Missing required config parameter: {section}.{key}")
         
-        forecast_days = self.config['data']['forecast_days']
-        if not isinstance(forecast_days, list):
-            raise ValueError("forecast_days must be a list of integers")
+        forecast_hours = self.config['data']['forecast_hours']
+        if not isinstance(forecast_hours, list):
+            raise ValueError("forecast_hours must be a list of integers")
     
     def _compute_temporal_parameters(self):
         data_config = self.config['data']
         time_step = data_config['time_step']
-        forecast_days = data_config['forecast_days']
-        self.lead_times_hours = [days * 24 for days in forecast_days]
+        forecast_hours = data_config['forecast_hours']
+        self.lead_times_hours = forecast_hours  # Already in hours
         data_config['lead_times_hours'] = self.lead_times_hours
         
         print("Multi-horizon temporal configuration:")
         print(f"  Time step: {time_step} hour(s)")
-        print(f"  Forecast horizons: {forecast_days} days = {self.lead_times_hours} hours")
+        print(f"  Forecast horizons: {forecast_hours} hours")
     
     def get_data_config(self) -> Dict[str, Any]:
         return self.config['data']
@@ -71,7 +71,7 @@ class ConfigManager:
         
         print("\nMulti-horizon setup:")
         print(f"  Time step: {data_config.get('time_step')} hour(s)")
-        print(f"  Forecast horizons: {data_config.get('forecast_days')} days")
+        print(f"  Forecast horizons: {data_config.get('forecast_hours')} days")
         print(f"  Lead times: {data_config.get('lead_times_hours')} hours")
         
         print("=" * 52)
