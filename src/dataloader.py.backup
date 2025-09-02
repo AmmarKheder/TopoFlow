@@ -193,21 +193,15 @@ class PM25AirQualityDataset(Dataset):
         # Stack des variables: [n_vars, target_h, target_w]
         input_data = np.stack(input_vars, axis=0)
         
-        # Variables cibles avec même downsampling - SUPPORT MULTI-POLLUANTS
+        # Variable cible avec même downsampling
         target_t = t + forecast_hours
-        target_data_list = []
-        for target_var in self.target_variables:
-            target_data = ds[target_var].isel(time=target_t).values
-            target_data = self._normalize(target_data, target_var)
-            target_data = self._downsample_tensor(target_data)  # [target_h, target_w]
-            target_data_list.append(target_data)
-        
-        # Stack des variables cibles: [n_targets, target_h, target_w]
-        target_data_stacked = torch.stack(target_data_list, dim=0)
+        target_data = ds[self.target_variables[0]].isel(time=target_t).values
+        target_data = self._normalize(target_data, self.target_variables[0])
+        target_data = self._downsample_tensor(target_data)  # [target_h, target_w]
         
         # Conversion en tenseurs
         input_tensor = torch.from_numpy(input_data).float()
-        target_tensor = target_data_stacked.float()
+        target_tensor = target_data.float()
         lead_time_tensor = torch.tensor(forecast_hours, dtype=torch.float32)
         
         return input_tensor, target_tensor, lead_time_tensor, tuple(self.variables)

@@ -8,12 +8,12 @@ import torch
 import torch.nn as nn
 from timm.models.vision_transformer import Block, PatchEmbed, trunc_normal_
 
-from climax_core.utils.pos_embed import (
+from src.climax_core.utils.pos_embed import (
     get_1d_sincos_pos_embed_from_grid,
     get_2d_sincos_pos_embed,
 )
 
-from climax_core.parallelpatchembed import ParallelVarPatchEmbed
+from src.climax_core.parallelpatchembed import ParallelVarPatchEmbed
 
 
 class ClimaX(nn.Module):
@@ -156,8 +156,11 @@ class ClimaX(nn.Module):
             idx += 1
         return var_embed, var_map
 
+    
     @lru_cache(maxsize=None)
     def get_var_ids(self, vars, device):
+        if isinstance(vars, list):
+            vars = tuple(vars)
         ids = np.array([self.var_map[var] for var in vars])
         return torch.from_numpy(ids).to(device)
 

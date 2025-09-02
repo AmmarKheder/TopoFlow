@@ -1,0 +1,74 @@
+# AQ_Net2 - Configuration Zarr optimisée avec DDP 4 GPUs
+
+# Training settings - DDP 4 GPUs
+train:
+  epochs: 10
+  batch_size: 2                        # Batch par GPU
+  accumulate_grad_batches: 4          # Total batch size = 2×4×4 = 32
+  val_batch_size: 8
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  devices: 4                          # 4 GPUs per node
+  accelerator: 'gpu'
+  strategy: 'ddp'                     # DDP strategy
+  precision: 32                       # Full precision training
+  gradient_clip_val: 1.0
+  log_every_n_steps: 10
+  val_check_interval: 1.0
+
+# Early stopping and checkpointing
+callbacks:
+  early_stopping:
+    monitor: 'val_loss'
+    patience: 10
+    mode: 'min'
+  model_checkpoint:
+    monitor: 'val_loss'
+    mode: 'min'
+    save_top_k: 3
+    filename: 'epoch_{epoch:02d}-val_loss_{val_loss:.4f}'
+
+# Data configuration - ZARR OPTIMIZED
+data:
+  data_path: "./data_processed/"       # Zarr consolidés
+  train_years: [2013, 2014, 2015, 2016]  # Années d'entraînement
+  val_years: [2017]                      # Validation sur 2017
+  test_years: [2018]                     # Test sur 2018
+  variables: ['u', 'v', 'temp', 'rh', 'psfc', 'pm10', 'so2', 'no2', 'co', 'o3', 'lat2d', 'lon2d']
+  target_variables: ['pm25']
+  coordinate_variables: ['lat2d', 'lon2d']
+  time_step: 1
+  forecast_days: [1, 3, 5, 7]
+  normalize: true
+  target_resolution: [128, 256]  # Downsampled resolution
+  num_workers: 8                        # Adapté au DDP 4 GPUs
+  consolidated: true                    # Zarr optimisé
+  prefetch_factor: 2                    # Préchargement
+
+# Model configuration
+model:
+  img_size: [128, 256]  # Downsampled resolution
+  patch_size: 2
+  embed_dim: 768
+  depth: 6
+  decoder_depth: 2
+  num_heads: 8
+  mlp_ratio: 4
+  drop_path: 0.1
+  drop_rate: 0.1
+  use_upsampling: true
+
+# System configuration
+system:
+  miopen_cache_dir: "/scratch/project_462000640/ammar/miopen_cache"
+
+# Lightning specific
+lightning:
+  logger:
+    name: 'PM25_ClimaX_Zarr_DDP4'
+    project: 'aq_net2'
+  trainer:
+    default_root_dir: './lightning_logs'
+    enable_checkpointing: true
+    enable_model_summary: true
+    log_every_n_steps: 10
