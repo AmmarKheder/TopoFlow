@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=rmse_72h_2018
+#SBATCH --job-name=rmse_baseline
 #SBATCH --account=project_462000640
 #SBATCH --partition=small-g
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --nodes=4
+#SBATCH --ntasks=4
 #SBATCH --cpus-per-task=7
-#SBATCH --gpus-per-node=1
+#SBATCH --gpus-per-node=4
 #SBATCH --mem=60G
-#SBATCH --time=72:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/rmse_72h_2018_%j.out
 #SBATCH --error=logs/rmse_72h_2018_%j.err
 
@@ -35,7 +35,7 @@ export TIMM_FUSED_ATTN=0
 
 export ROCM_PATH=/opt/rocm
 export HIP_VISIBLE_DEVICES=0
-export PYTORCH_HIP_ALLOC_CONF=expandable_segments:False
+export PYTORCH_HIP_ALLOC_CONF=expandable_segments:True
 
 export MIOPEN_USER_DB_PATH=/tmp/${USER}-miopen-cache-${SLURM_JOB_ID}
 mkdir -p ${MIOPEN_USER_DB_PATH}

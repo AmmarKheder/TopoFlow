@@ -238,7 +238,7 @@ def main():
     # Data module
     # Create dataset with fixed indices
     test_dataset = create_dataset_fixed(config, mode="test", fixed_indices_file="data_processed/fixed_eval_indices.json")
-    test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+    test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=4)
     print(f"Test dataset: {len(test_dataset)} samples")
     
     # Load model
