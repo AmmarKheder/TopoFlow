@@ -210,7 +210,7 @@ class PM25AirQualityDataset(Dataset):
         target_tensor = target_data_stacked.float()
         lead_time_tensor = torch.tensor(forecast_hours, dtype=torch.float32)
         
-        return input_tensor, target_tensor, lead_time_tensor, tuple(self.variables)
+        return input_tensor, target_tensor, lead_time_tensor
 
 def create_dataset(config, mode='train'):
     """Créer le dataset depuis la config"""

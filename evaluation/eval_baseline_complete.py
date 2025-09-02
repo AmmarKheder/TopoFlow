@@ -118,7 +118,8 @@ from matplotlib.gridspec import GridSpec
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 from config_manager import ConfigManager
-from datamodule_fixed import AQNetDataModule
+from dataloader_fixed import create_dataset_fixed
+from torch.utils.data import DataLoader
 from model_multipollutants import MultiPollutantLightningModule
 from dataloader_zarr_optimized import NORM_STATS
 
@@ -235,10 +236,10 @@ def main():
     config = config_manager.config
     
     # Data module
-    data_module = AQNetDataModule(config)
-    data_module.setup('test')
-    test_dataloader = data_module.test_dataloader()
-    print(f"Test dataset: {len(test_dataloader.dataset)} samples")
+    # Create dataset with fixed indices
+    test_dataset = create_dataset_fixed(config, mode="test", fixed_indices_file="data_processed/fixed_eval_indices.json")
+    test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+    print(f"Test dataset: {len(test_dataset)} samples")
     
     # Load model
     print("\n🔄 Loading baseline model (epoch 9)...")
@@ -285,7 +286,9 @@ def main():
             if i % 100 == 0:
                 print(f"Batch {i}/{len(test_dataloader)}")
             
-            inputs, targets, lead_times, variables = batch
+            # Dataloader returns (inputs, targets, lead_times)
+            inputs, targets, lead_times = batch
+            variables = config['data']['variables']
             inputs = inputs.to(device)
             lead_times = lead_times.to(device)
             
