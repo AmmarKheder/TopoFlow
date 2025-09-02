@@ -84,7 +84,7 @@ def main(config_path):
     print("🏃‍♂️ DÉMARRAGE DE L'ENTRAÎNEMENT MULTI-POLLUANTS")
     print("="*60)
     print(f"🎯 Polluants: {', '.join(config['data']['target_variables'])}")
-    print(f"🚀 Horizons: {config['data']['forecast_days']} jours")
+    print(f"🚀 Horizons: {config['data']['forecast_hours']} heures")
     print(f"⚡ GPUs: {config['train']['devices']}")
     print(f"📦 Batch size: {config['train']['batch_size']} par GPU")
     print("="*60 + "\n")
