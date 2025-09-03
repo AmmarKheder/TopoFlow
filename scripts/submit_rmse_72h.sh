@@ -19,8 +19,8 @@ module load rocm/6.0.3
 echo "=========================================="
 echo "🚀 ÉVALUATION RMSE - MAX POWER!"
 echo "Job ID: $SLURM_JOB_ID"
-echo "GPUs: 1"
-echo "Nodes: 1"
+echo "GPUs: 4"
+echo "Nodes: 4"
 echo "Partition: small-g"
 echo "💪 MAX POWER SMALL-G"
 echo "Date: $(date)"
@@ -30,7 +30,7 @@ cd /scratch/project_462000640/ammar/aq_net2
 
 source venv_pytorch_rocm/bin/activate
 export PYTHONUNBUFFERED=1
-export PYTHONPATH=/scratch/project_462000640/ammar/aq_net2:$PYTHONPATH
+export PYTHONPATH=/scratch/project_462000640/ammar/aq_net2:/scratch/project_462000640/ammar/aq_net2/src:$PYTHONPATH
 export TIMM_FUSED_ATTN=0
 
 export ROCM_PATH=/opt/rocm
@@ -42,7 +42,7 @@ mkdir -p ${MIOPEN_USER_DB_PATH}
 
 mkdir -p results
 
-echo "🔥 Lancement évaluation RMSE MAX POWER (1 GPU, 4K échantillons)..."
+echo "🔥 Lancement évaluation RMSE MAX POWER (4 GPU, 4K échantillons)..."
 
 /scratch/project_462000640/ammar/aq_net2/venv_pytorch_rocm/bin/python evaluation/eval_baseline_complete.py
 

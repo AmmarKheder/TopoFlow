@@ -100,7 +100,7 @@ def plot_rmse_evolution(results, target_vars, forecast_hours, output_dir):
 
 #!/usr/bin/env python3
 """
-BASELINE EVALUATION COMPLETE - Epoch 9 (val_loss=0.0710) - CHINA REGION ONLY
+BASELINE EVALUATION COMPLETE - Epoch 1 (val_loss=0.0710) - CHINA REGION ONLY
 Calculate RMSE/MAE per pollutant and horizon + Generate comparison maps
 """
 
@@ -131,7 +131,7 @@ def denormalize_data(data, variable):
     return data
 
 def main():
-    print("🚀 BASELINE EVALUATION COMPLETE - Epoch 9")
+    print("🚀 BASELINE EVALUATION COMPLETE - Epoch 1")
     print("📊 6 pollutants × 4 forecast horizons × CHINA REGION ONLY")
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -157,8 +157,8 @@ def main():
     print(f"Test dataset: {len(test_dataset)} samples")
     
     # Load model
-    print("\n🔄 Loading baseline model (epoch 9)...")
-    best_checkpoint = "logs/multipollutants_climax_ddp/version_7/checkpoints/epoch_epoch=09-val_loss_val_loss=0.0710.ckpt"
+    print("\n🔄 Loading baseline model (epoch 1)...")
+    best_checkpoint = "logs/multipollutants_climax_ddp/version_9/checkpoints/epoch_epoch=01-val_loss_val_loss=0.2334.ckpt"
     
     if os.path.exists(best_checkpoint):
         model = MultiPollutantLightningModule.load_from_checkpoint(best_checkpoint, config=config)
@@ -266,7 +266,7 @@ def main():
     
     # Calculate and display final metrics
     print("\n" + "="*80)
-    print("📊 BASELINE RESULTS - EPOCH 9 (val_loss=0.0710) - CHINA REGION ONLY")
+    print("📊 BASELINE RESULTS - EPOCH 1 (val_loss=0.2334) - CHINA REGION ONLY")
     print("="*80)
     
     results = {}
