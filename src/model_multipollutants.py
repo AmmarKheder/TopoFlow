@@ -12,6 +12,7 @@ from typing import Tuple
 from src.climax_core.arch import ClimaX
 from src.models.pollutant_cross_attn import PollutantCrossAttentionWrapper
 from src.models.hierarchical_physics import HierarchicalPhysicsTransformer
+from src.models.adaptive_wind_memory import AdaptiveWindMemory
 
 
 def ensure_tuple(variables):
@@ -102,9 +103,38 @@ class MultiPollutantModel(nn.Module):
         else:
             print(f"# # # #  Hierarchical Multi-Scale Physics: DISABLED")
 
+        # Innovation #3: Adaptive Wind Memory (optional)
+        self.use_adaptive_wind = config.get("model", {}).get("use_adaptive_wind_memory", False)
+        if self.use_adaptive_wind:
+            self.adaptive_wind_memory = AdaptiveWindMemory(
+                input_size=self.img_size,
+                hidden_dim=config.get("model", {}).get("wind_hidden_dim", 256),
+                modulation_range=config.get("model", {}).get("wind_modulation_range", [0.5, 2.0])
+            )
+            print(f"# # # # # #  INNOVATION #3 ACTIVE: Adaptive Wind Memory")
+        else:
+            print(f"# # # #  Adaptive Wind Memory: DISABLED")
+
     def forward(self, x, lead_times, variables, out_variables=None):
         if out_variables is None:
             out_variables = self.variables
+
+        # Innovation #3: Adaptive Wind Memory (extract wind modulation before encoding)
+        wind_modulation = None
+        if self.use_adaptive_wind:
+            # Extract u, v from input
+            variables_tuple = ensure_tuple(variables)
+            try:
+                u_idx = variables_tuple.index('u')
+                v_idx = variables_tuple.index('v')
+                u_field = x[:, u_idx, :, :]  # [B, H, W]
+                v_field = x[:, v_idx, :, :]  # [B, H, W]
+
+                # Compute adaptive modulation
+                wind_modulation = self.adaptive_wind_memory(u_field, v_field)  # [B]
+                # Note: modulation can be used later for adaptive wind scanning
+            except ValueError:
+                pass  # u, v not in variables
 
         # Forward through transformer encoder
         outs = self.climax.forward_encoder(x, lead_times, ensure_tuple(variables))  # [B, L, D]

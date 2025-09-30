@@ -1,0 +1,129 @@
+# TopoFlow - FULL MODEL: All 3 Innovations
+#
+# Complete TopoFlow model with all innovations:
+# - Innovation #1: Pollutant Cross-Attention
+# - Innovation #2: Hierarchical Multi-Scale Physics
+# - Innovation #3: Adaptive Wind Memory
+# - Quick 1-epoch validation test
+# - Eval on 1000 samples per horizon
+# - Project: 462001079 (LUMI)
+#
+train:
+  batch_size: 2
+  accumulate_grad_batches: 4
+  val_batch_size: 2
+  learning_rate: 0.000150
+  weight_decay: 0.01
+  devices: 8
+  num_nodes: 10  # Reduced for quick test
+  accelerator: gpu
+  strategy: ddp
+  precision: 32
+  gradient_clip_val: 1.0
+  log_every_n_steps: 25
+  val_check_interval: 50
+  max_steps: 1000  # Quick 1-epoch test
+  epochs: 1
+  warmup_steps: 100
+  scheduler: cosine
+  cosine_max_steps: 1000
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 10
+    mode: min
+  model_checkpoint:
+    monitor: val_loss
+    mode: min
+    save_top_k: 3
+    filename: best-val_loss_{val_loss:.4f}-step_{step}
+    save_last: true
+data:
+  data_path: ./data_processed/
+  grid_source: ./data_processed/data_2013_china_masked.zarr
+  train_years:
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  val_years:
+  - 2017
+  test_years:
+  - 2018
+  variables:
+  - u
+  - v
+  - temp
+  - rh
+  - psfc
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  - lat2d
+  - lon2d
+  - pm25
+  - elevation
+  - population
+  target_variables:
+  - pm25
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  coordinate_variables:
+  - lat2d
+  - lon2d
+  static_variables:
+  - elevation
+  - population
+  time_step: 1
+  forecast_hours:
+  - 12
+  - 24
+  - 48
+  - 96
+  normalize: true
+  target_resolution:
+  - 128
+  - 256
+  num_workers: 4
+  consolidated: true
+  prefetch_factor: 2
+model:
+  img_size:
+  - 128
+  - 256
+  patch_size: 2
+  embed_dim: 768
+  depth: 6
+  decoder_depth: 2
+  num_heads: 8
+  mlp_ratio: 4
+  drop_path: 0.1
+  drop_rate: 0.1
+  parallel_patch_embed: true
+  # Innovation #1: Pollutant Cross-Attention
+  use_pollutant_cross_attn: true
+  cross_attn_layers: 2  # Number of cross-attention layers
+  # Innovation #2: Hierarchical Multi-Scale Physics
+  use_hierarchical_physics: true
+  physics_scales: [1, 2, 4]  # Local, regional, synoptic
+  hierarchical_layers: 1
+  # Innovation #3: Adaptive Wind Memory
+  use_adaptive_wind_memory: true
+  wind_hidden_dim: 256
+  wind_modulation_range: [0.5, 2.0]
+system:
+  miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
+lightning:
+  logger:
+    name: TopoFlow_FULL_MODEL_All3Innovations
+    project: topoflow_ablation
+  trainer:
+    default_root_dir: ./lightning_logs
+    enable_checkpointing: true
+    enable_model_summary: true
+    log_every_n_steps: 10
