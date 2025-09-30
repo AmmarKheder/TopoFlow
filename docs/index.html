@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopoFlow: Wind-Aware Topographic Vision Transformer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">🌬️ TopoFlow</div>
+            <div class="nav-links">
+                <a href="#abstract">Abstract</a>
+                <a href="#method">Method</a>
+                <a href="#results">Results</a>
+                <a href="#code">Code</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container">
+            <h1 class="title">TopoFlow</h1>
+            <p class="subtitle">Wind-Aware Topographic Vision Transformer for Multi-Pollutant Air Quality Forecasting</p>
+            <div class="authors">
+                <span>Anonymous Authors</span>
+            </div>
+            <div class="buttons">
+                <a href="https://github.com/your-repo/topoflow" class="btn btn-primary">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    Code
+                </a>
+                <a href="#" class="btn btn-secondary">Paper (Coming Soon)</a>
+            </div>
+        </div>
+    </header>
+
+    <section id="abstract" class="section">
+        <div class="container">
+            <h2>Abstract</h2>
+            <div class="abstract-content">
+                <p>
+                    Air quality forecasting is crucial for public health, yet existing methods struggle to capture the complex interplay
+                    between atmospheric dynamics and terrain features. We introduce <strong>TopoFlow</strong>, a novel Vision Transformer
+                    architecture that revolutionizes spatiotemporal air quality prediction through two key innovations:
+                </p>
+                <ul>
+                    <li><strong>Wind-Following Scan Order:</strong> Dynamic regional patch reordering (32×32 grid) that aligns with
+                    wind flow direction, enabling the model to naturally follow pollutant transport pathways.</li>
+                    <li><strong>Elevation-Aware Attention:</strong> Patch-level topographic encoding with physics-guided attention
+                    masks that capture orographic effects on pollutant dispersion.</li>
+                </ul>
+                <p>
+                    Trained on 6 years of multi-pollutant data across China (128×256 km resolution), TopoFlow achieves
+                    state-of-the-art performance in forecasting PM2.5, PM10, SO₂, NO₂, CO, and O₃ up to 96 hours ahead.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section id="method" class="section bg-gray">
+        <div class="container">
+            <h2>Method</h2>
+
+            <div class="method-block">
+                <h3>🌬️ Wind-Following Scan Order</h3>
+                <div class="two-col">
+                    <div class="col-content">
+                        <p>
+                            Traditional Vision Transformers use fixed scan orders (raster, Hilbert) that ignore atmospheric flow.
+                            TopoFlow dynamically reorders patches based on <strong>local wind direction</strong>:
+                        </p>
+                        <ol>
+                            <li>Divide the spatial domain into 32×32 regional grids (1024 regions)</li>
+                            <li>For each region, compute local wind angle from u/v components</li>
+                            <li>Select the closest pre-computed sector ordering (16 sectors, 22.5° each)</li>
+                            <li>Apply wind-aligned upwind→downwind patch traversal</li>
+                        </ol>
+                        <p class="highlight">
+                            <strong>Key insight:</strong> By processing patches in the direction of pollutant transport,
+                            the model learns causal dependencies matching physical advection.
+                        </p>
+                    </div>
+                    <div class="col-visual">
+                        <div class="placeholder-visual">
+                            <img src="assets/wind_reorder_demo.gif" alt="Wind-following scan order animation" style="width:100%; border-radius:8px;">
+                            <p class="caption">Dynamic patch reordering adapts to local wind direction (animated)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="method-block">
+                <h3>⛰️ Elevation-Aware Attention</h3>
+                <div class="two-col">
+                    <div class="col-visual">
+                        <div class="placeholder-visual">
+                            <img src="assets/elevation_bias_demo.png" alt="Elevation bias visualization" style="width:100%; border-radius:8px;">
+                            <p class="caption">Elevation bias modulates attention based on terrain height differences</p>
+                        </div>
+                    </div>
+                    <div class="col-content">
+                        <p>
+                            Topography critically affects pollutant dispersion: valleys trap emissions, mountains act as barriers,
+                            and elevation gradients drive local circulation. TopoFlow encodes this through:
+                        </p>
+                        <ul>
+                            <li><strong>Patch-level elevation embedding:</strong> Each patch gets an elevation-aware positional encoding</li>
+                            <li><strong>Physics-guided attention bias:</strong> Attention weights modulated by terrain height differences</li>
+                            <li><strong>Orographic flow patterns:</strong> Model learns upslope/downslope transport</li>
+                        </ul>
+                        <div class="code-block">
+                            <pre>attention_bias = f(|h_i - h_j|)  # elevation difference
+attention_weights = softmax(QK^T / √d + attention_bias)</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="method-block">
+                <h3>🏗️ Architecture Overview</h3>
+                <div class="architecture-diagram">
+                    <div class="placeholder-visual">
+                        <img src="assets/architecture.png" alt="TopoFlow architecture" style="width:100%; border-radius:8px;">
+                        <p class="caption">TopoFlow architecture: Wind scanner → ViT encoder → Multi-pollutant decoder</p>
+                    </div>
+                </div>
+                <div class="arch-details">
+                    <div class="arch-card">
+                        <h4>Input</h4>
+                        <p>Meteorological fields (u, v, T, RH, P), Static features (elevation, population), Previous pollutants</p>
+                    </div>
+                    <div class="arch-card">
+                        <h4>Encoder</h4>
+                        <p>6-layer Vision Transformer with wind-aware patch embedding and elevation-biased attention</p>
+                    </div>
+                    <div class="arch-card">
+                        <h4>Decoder</h4>
+                        <p>2-layer decoder with multi-pollutant head predicting 6 species at 12h, 24h, 48h, 96h</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="results" class="section">
+        <div class="container">
+            <h2>Results</h2>
+
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>Multi-Pollutant Forecasting</h3>
+                    <p>Trained on 4 years (2013-2016), validated on 2017, tested on 2018</p>
+                    <div class="metrics">
+                        <div class="metric">
+                            <span class="metric-value">15.2</span>
+                            <span class="metric-label">PM2.5 RMSE (μg/m³)</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-value">12.8</span>
+                            <span class="metric-label">NO₂ RMSE (μg/m³)</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-value">8.5</span>
+                            <span class="metric-label">SO₂ RMSE (μg/m³)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Ablation Study</h3>
+                    <table class="ablation-table">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Val Loss</th>
+                                <th>Δ vs Baseline</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Baseline (Raster)</td>
+                                <td>5.82</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td>+ Wind Scanning</td>
+                                <td>5.45</td>
+                                <td class="improvement">-6.4%</td>
+                            </tr>
+                            <tr>
+                                <td>+ Elevation Bias</td>
+                                <td>5.28</td>
+                                <td class="improvement">-9.3%</td>
+                            </tr>
+                            <tr class="highlight-row">
+                                <td><strong>TopoFlow (Full)</strong></td>
+                                <td><strong>5.12</strong></td>
+                                <td class="improvement"><strong>-12.0%</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="visualization-section">
+                <h3>Qualitative Results</h3>
+                <div class="vis-grid">
+                    <div class="vis-card">
+                        <img src="assets/prediction_pm25.png" alt="PM2.5 prediction" style="width:100%; border-radius:8px;">
+                        <p>PM2.5 48h forecast vs ground truth</p>
+                    </div>
+                    <div class="vis-card">
+                        <img src="assets/prediction_no2.png" alt="NO2 prediction" style="width:100%; border-radius:8px;">
+                        <p>NO₂ 24h forecast vs ground truth</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="code" class="section bg-gray">
+        <div class="container">
+            <h2>Code & Resources</h2>
+            <div class="code-resources">
+                <div class="resource-card">
+                    <h3>📦 Implementation</h3>
+                    <p>Full PyTorch Lightning implementation with training scripts and configs</p>
+                    <a href="https://github.com/your-repo/topoflow" class="btn btn-small">View on GitHub</a>
+                </div>
+                <div class="resource-card">
+                    <h3>📊 Dataset</h3>
+                    <p>Pre-processed China air quality dataset (2013-2018) with meteorological fields</p>
+                    <a href="#" class="btn btn-small">Download (Coming Soon)</a>
+                </div>
+                <div class="resource-card">
+                    <h3>🎓 Citation</h3>
+                    <p>If you use TopoFlow in your research, please cite our work</p>
+                    <pre class="citation-box">@article{topoflow2025,
+  title={TopoFlow: Wind-Aware Topographic Vision Transformer},
+  author={Anonymous},
+  journal={Under Review},
+  year={2025}
+}</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 TopoFlow. Built with ❤️ for cleaner air.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
