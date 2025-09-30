@@ -1,0 +1,116 @@
+# TopoFlow - Wind Scanning Baseline (from scratch)
+#
+# Baseline avec wind scanning 32×32 SANS innovations
+# Training from scratch pour 6 époques
+# Project: 462001079 (LUMI)
+#
+train:
+  batch_size: 2
+  accumulate_grad_batches: 4
+  val_batch_size: 2
+  learning_rate: 0.000150
+  weight_decay: 0.01
+  devices: 8
+  num_nodes: 50  # 400 GPUs
+  accelerator: gpu
+  strategy: ddp
+  precision: 32
+  gradient_clip_val: 1.0
+  log_every_n_steps: 50
+  val_check_interval: 100
+  epochs: 6
+  warmup_steps: 500
+  scheduler: cosine
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 10
+    mode: min
+  model_checkpoint:
+    monitor: val_loss
+    mode: min
+    save_top_k: 3
+    filename: best-val_loss_{val_loss:.4f}-epoch_{epoch}
+    save_last: true
+data:
+  data_path: ./data_processed/
+  grid_source: ./data_processed/data_2013_china_masked.zarr
+  train_years:
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  val_years:
+  - 2017
+  test_years:
+  - 2018
+  variables:
+  - u
+  - v
+  - temp
+  - rh
+  - psfc
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  - lat2d
+  - lon2d
+  - pm25
+  - elevation
+  - population
+  target_variables:
+  - pm25
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  coordinate_variables:
+  - lat2d
+  - lon2d
+  static_variables:
+  - elevation
+  - population
+  time_step: 1
+  forecast_hours:
+  - 12
+  - 24
+  - 48
+  - 96
+  normalize: true
+  target_resolution:
+  - 128
+  - 256
+  num_workers: 4
+  consolidated: true
+  prefetch_factor: 2
+model:
+  img_size:
+  - 128
+  - 256
+  patch_size: 2
+  embed_dim: 768
+  depth: 6
+  decoder_depth: 2
+  num_heads: 8
+  mlp_ratio: 4
+  drop_path: 0.1
+  drop_rate: 0.1
+  parallel_patch_embed: false
+  # NO INNOVATIONS - Wind scanning baseline only
+  use_pollutant_cross_attn: false
+  use_hierarchical_physics: false
+  use_adaptive_wind_memory: false
+system:
+  miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
+lightning:
+  logger:
+    name: TopoFlow_WindScanning_Baseline
+    project: topoflow_ablation_fromscratch
+  trainer:
+    default_root_dir: ./lightning_logs
+    enable_checkpointing: true
+    enable_model_summary: true
+    log_every_n_steps: 10
