@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=topoflow_wind_baseline
+#SBATCH --job-name=wind_elev_400gpu
 #SBATCH --account=project_462001079
 #SBATCH --partition=standard-g
 #SBATCH --nodes=50
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
-#SBATCH --time=18:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/topoflow_wind_baseline_%j.out
 #SBATCH --error=logs/topoflow_wind_baseline_%j.err
 

@@ -98,7 +98,7 @@ model:
   mlp_ratio: 4
   drop_path: 0.1
   drop_rate: 0.1
-  parallel_patch_embed: true
+  parallel_patch_embed: true  # Wind scanning enabled
   # NO INNOVATIONS - Wind scanning baseline only
   use_pollutant_cross_attn: false
   use_hierarchical_physics: false

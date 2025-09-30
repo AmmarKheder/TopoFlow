@@ -35,62 +35,11 @@ class CachedWindScanning:
         
         # Cache for reorder indices per sector
         self.cached_orders = {}
+        self._precompute_all_orders()
+
+        # Regional cache for 32x32 regions
         self.regional_cached_orders = {}
-
-        # Initialize cache with DDP awareness
-        self._init_cache_ddp_safe()
-
-    def _init_cache_ddp_safe(self):
-        """Initialize cache with DDP awareness - only rank 0 computes, then broadcasts."""
-        import torch.distributed as dist
-
-        is_ddp = dist.is_initialized()
-        rank = dist.get_rank() if is_ddp else 0
-
-        if rank == 0:
-            # Only rank 0 computes the cache
-            self._precompute_all_orders()
-            self._precompute_regional_orders_32x32()
-
-        if is_ddp:
-            # Barrier: wait for rank 0 to finish
-            dist.barrier()
-
-            # Broadcast cached_orders
-            if rank == 0:
-                cache_list = [self.cached_orders[i] for i in range(self.num_sectors)]
-            else:
-                cache_list = [torch.zeros(self.num_patches, dtype=torch.long) for _ in range(self.num_sectors)]
-
-            for i, tensor in enumerate(cache_list):
-                dist.broadcast(tensor, src=0)
-                if rank != 0:
-                    self.cached_orders[i] = tensor
-
-            # Broadcast regional_cached_orders
-            if rank == 0:
-                regional_flat = []
-                for region_idx in range(self.total_regions):
-                    for sector_idx in range(self.num_sectors):
-                        regional_flat.append(self.regional_cached_orders[region_idx][sector_idx])
-            else:
-                patches_per_region = (self.grid_h // self.regions_h) * (self.grid_w // self.regions_w)
-                regional_flat = [torch.zeros(patches_per_region, dtype=torch.long)
-                               for _ in range(self.total_regions * self.num_sectors)]
-
-            for tensor in regional_flat:
-                dist.broadcast(tensor, src=0)
-
-            # Reconstruct regional cache on non-rank-0
-            if rank != 0:
-                idx = 0
-                for region_idx in range(self.total_regions):
-                    self.regional_cached_orders[region_idx] = {}
-                    for sector_idx in range(self.num_sectors):
-                        self.regional_cached_orders[region_idx][sector_idx] = regional_flat[idx]
-                        idx += 1
-
-            dist.barrier()
+        self._precompute_regional_orders_32x32()
 
     def _precompute_all_orders(self):
         """Pre-compute patch reordering for all wind sectors."""
