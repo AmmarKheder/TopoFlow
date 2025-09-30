@@ -4,8 +4,8 @@ Pollutant Cross-Attention Module - Innovation #1
 
 Models chemical interactions between pollutants using learned cross-attention.
 Based on known atmospheric chemistry:
-- O₃ formation: NO₂ + VOC + sunlight → O₃
-- PM2.5 composition: SO₂ → sulfates → PM2.5
+- O??? formation: NO??? + VOC + sunlight ??? O???
+- PM2.5 composition: SO??? ??? sulfates ??? PM2.5
 - Chemical coupling: pollutants influence each other's concentrations
 
 This is GUARANTEED to work because it's based on proven atmospheric chemistry.
@@ -25,7 +25,7 @@ class PollutantCrossAttentionModule(nn.Module):
     Cross-attention module that models chemical interactions between pollutants.
 
     Key idea: Each pollutant's prediction should attend to other pollutants
-    that are chemically related (e.g., O₃ attends to NO₂, temperature, UV).
+    that are chemically related (e.g., O??? attends to NO???, temperature, UV).
 
     Args:
         embed_dim: Embedding dimension (same as transformer)
@@ -89,10 +89,10 @@ class PollutantCrossAttentionModule(nn.Module):
         Initialize attention bias based on known chemical relationships.
 
         Stronger connections for chemically related pollutants:
-        - O₃ ↔ NO₂ (ozone formation chemistry)
-        - PM2.5 ↔ SO₂ (sulfate formation)
-        - PM2.5 ↔ PM10 (size correlation)
-        - NO₂ ↔ CO (combustion sources)
+        - O??? ??? NO??? (ozone formation chemistry)
+        - PM2.5 ??? SO??? (sulfate formation)
+        - PM2.5 ??? PM10 (size correlation)
+        - NO??? ??? CO (combustion sources)
 
         Returns:
             bias: [num_pollutants, num_pollutants] attention bias matrix

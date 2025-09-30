@@ -28,8 +28,8 @@ class WindSpatialEncoder(nn.Module):
     """
     Encodes spatial wind patterns to capture coherence and strength.
 
-    Strong, coherent winds → higher modulation (aggressive scanning)
-    Weak, chaotic winds → lower modulation (conservative scanning)
+    Strong, coherent winds ??? higher modulation (aggressive scanning)
+    Weak, chaotic winds ??? lower modulation (conservative scanning)
     """
 
     def __init__(
@@ -108,8 +108,8 @@ class AdaptiveWindMemory(nn.Module):
     Adaptive wind-based modulation for patch scanning.
 
     Combines wind strength and coherence to compute adaptive modulation:
-    - High strength + high coherence → aggressive scanning (modulation ≈ 1.5-2.0)
-    - Low strength or low coherence → conservative scanning (modulation ≈ 0.5-1.0)
+    - High strength + high coherence ??? aggressive scanning (modulation ??? 1.5-2.0)
+    - Low strength or low coherence ??? conservative scanning (modulation ??? 0.5-1.0)
     """
 
     def __init__(
@@ -241,7 +241,7 @@ def test_adaptive_wind_memory():
     print(f"\n# # #  Modulation: {modulation_strong.mean().item():.3f}")
     print(f"  Strength: {stats_strong['strength']:.3f}")
     print(f"  Coherence: {stats_strong['coherence']:.3f}")
-    print("  → Strong wind should get high modulation (≈1.5-2.0)")
+    print("  ??? Strong wind should get high modulation (???1.5-2.0)")
 
     # Test weak wind
     print("\nScenario 2: Weak chaotic wind")
@@ -254,12 +254,12 @@ def test_adaptive_wind_memory():
     print(f"\n# # #  Modulation: {modulation_weak.mean().item():.3f}")
     print(f"  Strength: {stats_weak['strength']:.3f}")
     print(f"  Coherence: {stats_weak['coherence']:.3f}")
-    print("  → Weak wind should get low modulation (≈0.5-1.0)")
+    print("  ??? Weak wind should get low modulation (???0.5-1.0)")
 
     # Verify modulation difference
     mod_diff = modulation_strong.mean() - modulation_weak.mean()
     print(f"\n# # #  Modulation difference: {mod_diff.item():.3f}")
-    print("  → Positive difference confirms adaptive behavior!")
+    print("  ??? Positive difference confirms adaptive behavior!")
 
     print("\n" + "="*70)
     print("# # #  All tests passed!")

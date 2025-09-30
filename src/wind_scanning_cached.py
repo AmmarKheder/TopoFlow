@@ -23,7 +23,7 @@ class CachedWindScanning:
         self.num_sectors = num_sectors
         self.num_patches = grid_h * grid_w
         
-        # # # # #  DYNAMIC 32Ã# 64 configuration
+        # # # # #  DYNAMIC 32?# 64 configuration
         self.regions_h = 32  # Number of region rows
         self.regions_w = 32  # Number of region columns
         self.total_regions = self.regions_h * self.regions_w  # 1024 total (32x32)
@@ -54,7 +54,7 @@ class CachedWindScanning:
                 proj = self._calculate_patch_projection(row, col, angle)
                 projections.append((proj, patch_idx))
             
-            # Sort upwind # †’ downwind
+            # Sort upwind # ?? downwind
             projections.sort(key=lambda x: x[0])
             
             # Store as tensor (CPU initially, will move to GPU when needed)
@@ -65,8 +65,8 @@ class CachedWindScanning:
         print(f"# # #  Pre-computed {len(self.cached_orders)} sector orderings!")
 
     def _precompute_regional_orders_32x32(self):
-        """Pre-compute patch reordering for all regions Ã#  16 wind sectors."""
-        print(f"# # # #  Pre-computing regional cache: regions Ã#  {self.num_sectors} sectors...")
+        """Pre-compute patch reordering for all regions ?#  16 wind sectors."""
+        print(f"# # # #  Pre-computing regional cache: regions ?#  {self.num_sectors} sectors...")
         
         # Calculate regional dimensions
         region_h, region_w = self.grid_h // self.regions_h, self.grid_w // self.regions_w  # patches per region
@@ -91,7 +91,7 @@ class CachedWindScanning:
                     local_proj = self._calculate_patch_projection(local_row, local_col, angle)
                     regional_projections.append((local_proj, local_patch_idx))
                 
-                # Sort upwind # †’ downwind
+                # Sort upwind # ?? downwind
                 regional_projections.sort(key=lambda x: x[0])
                 
                 # Store as tensor (CPU initially, will move to GPU when needed)
@@ -99,7 +99,7 @@ class CachedWindScanning:
                                              dtype=torch.long)
                 self.regional_cached_orders[region_idx][sector_idx] = reorder_indices
         
-        print(f"# # #  Regional cache ready: {len(self.regional_cached_orders)} regions Ã#  {self.num_sectors} sectors!")
+        print(f"# # #  Regional cache ready: {len(self.regional_cached_orders)} regions ?#  {self.num_sectors} sectors!")
     
     def _get_patch_coordinates(self, patch_idx: int) -> Tuple[int, int]:
         """Convert patch index to (row, col) coordinates."""
@@ -142,7 +142,7 @@ class CachedWindScanning:
     
     def _find_closest_sector(self, wind_angle: float) -> int:
         """Find the closest pre-computed sector for given wind angle."""
-        # Normalize angle to [0, 2Ï# )
+        # Normalize angle to [0, 2?# )
         wind_angle = wind_angle % (2 * math.pi)
         
         # Find closest sector
@@ -232,7 +232,7 @@ class CachedWindScanning:
         region_h, region_w = self.grid_h // self.regions_h, self.grid_w // self.regions_w  # patches per region
         patches_per_region = region_h * region_w  # patches per region
         
-        #print(f"# # # # # # #  Applying 32Ã# 32 regional wind reordering: {region_h}Ã# {region_w} patches per region ({patches_per_region} patches)")
+        #print(f"# # # # # # #  Applying 32?# 32 regional wind reordering: {region_h}?# {region_w} patches per region ({patches_per_region} patches)")
         
         # Process each sample in batch
         for b in range(B):
@@ -268,7 +268,7 @@ class CachedWindScanning:
                         local_proj = self._calculate_patch_projection(local_row, local_col, region_wind_angle)
                         regional_projections.append((local_proj, local_patch_idx))
                     
-                    # Sort by projection (upwind # †’ downwind)
+                    # Sort by projection (upwind # ?? downwind)
                     regional_projections.sort(key=lambda x: x[0])
                     
                     # Extract sorted local indices
@@ -317,7 +317,7 @@ class CachedWindScanning:
                                                    u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
         """
         OPTIMIZED 8x8 regional wind reordering using pre-computed sector cache.
-        ~100Ã#  faster than recalculating projections each time!
+        ~100?#  faster than recalculating projections each time!
         """
         B, V, L, D = patch_tokens.shape
         device = patch_tokens.device
@@ -334,7 +334,7 @@ class CachedWindScanning:
         region_h, region_w = self.grid_h // self.regions_h, self.grid_w // self.regions_w  # patches per region
         patches_per_region = region_h * region_w  # patches per region
         
-        ##print(f"# # # #  Applying OPTIMIZED 32Ã# 32 regional wind reordering: {region_h}Ã# {region_w} patches per region ({patches_per_region} patches)")
+        ##print(f"# # # #  Applying OPTIMIZED 32?# 32 regional wind reordering: {region_h}?# {region_w} patches per region ({patches_per_region} patches)")
         
         # Process each sample in batch
         for b in range(B):
@@ -358,7 +358,7 @@ class CachedWindScanning:
                 # Find closest pre-computed sector (FAST!)
                 sector_idx = self._find_closest_sector(region_wind_angle)
                 
-                # Get pre-computed order for this regionÃ# sector (INSTANT!)
+                # Get pre-computed order for this region?# sector (INSTANT!)
                 reorder_indices = self.regional_cached_orders[region_idx][sector_idx]
                 
                 # Move to correct device if needed
@@ -438,7 +438,7 @@ class CachedWindScanning:
                         local_proj = self._calculate_patch_projection(local_row, local_col, region_wind_angle)
                         regional_projections.append((local_proj, local_patch_idx))
                     
-                    # Sort by projection (upwind # †’ downwind)
+                    # Sort by projection (upwind # ?? downwind)
                     regional_projections.sort(key=lambda x: x[0])
                     
                     # Extract sorted local indices
@@ -474,7 +474,7 @@ class CachedWindScanning:
         region_h, region_w = self.grid_h // self.regions_h, self.grid_w // self.regions_w  # patches per region
         patches_per_region = region_h * region_w  # patches per region
         
-        #print(f"# # # # # # #  Applying 32Ã# 32 regional wind reordering: {region_h}Ã# {region_w} patches per region ({patches_per_region} patches)")
+        #print(f"# # # # # # #  Applying 32?# 32 regional wind reordering: {region_h}?# {region_w} patches per region ({patches_per_region} patches)")
         
         # Process each sample in batch
         for b in range(B):
@@ -510,7 +510,7 @@ class CachedWindScanning:
                         local_proj = self._calculate_patch_projection(local_row, local_col, region_wind_angle)
                         regional_projections.append((local_proj, local_patch_idx))
                     
-                    # Sort by projection (upwind # †’ downwind)
+                    # Sort by projection (upwind # ?? downwind)
                     regional_projections.sort(key=lambda x: x[0])
                     
                     # Extract sorted local indices
@@ -586,7 +586,7 @@ def apply_cached_wind_reordering(patch_tokens: torch.Tensor,
     
     try:
         if regional_mode:
-            ##print(f"# # # #  Applying OPTIMIZED regional 8Ã# 8 wind reordering...")
+            ##print(f"# # # #  Applying OPTIMIZED regional 8?# 8 wind reordering...")
             return wind_scanner.apply_regional_wind_reordering_32x32_optimized(patch_tokens, u, v)
         else:
             print(f"# # # # # # #  Applying global wind reordering...")

@@ -2,10 +2,10 @@
 Physics-Guided Attention - PATCH LEVEL Implementation
 =====================================================
 
-Modification par patch au lieu de par r√©gion :
-1. Chaque patch a sa propre elevation (pas de moyennage r√©gional)
-2. Calcul direct patch-√# -patch sans regroupement
-3. Granularit√© maximale pour l'attention bas√©e sur l'elevation
+Modification par patch au lieu de par r??gion :
+1. Chaque patch a sa propre elevation (pas de moyennage r??gional)
+2. Calcul direct patch-?# -patch sans regroupement
+3. Granularit?? maximale pour l'attention bas??e sur l'elevation
 """
 
 import torch
@@ -21,18 +21,18 @@ class PhysicsGuidedAttentionPatchLevel(Attention):
     Physics-Guided Attention - Version PATCH LEVEL
     
     L'elevation agit au niveau de chaque patch individuel :
-    - R√©solution maximale : chaque patch 2√# 2 pixels a sa propre elevation
-    - Calcul direct de masque patch-√# -patch
-    - Plus pr√©cis mais potentiellement plus co√ªteux
+    - R??solution maximale : chaque patch 2?# 2 pixels a sa propre elevation
+    - Calcul direct de masque patch-?# -patch
+    - Plus pr??cis mais potentiellement plus co??teux
     """
     
     def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
         super().__init__(dim, num_heads, qkv_bias, attn_drop, proj_drop)
         
-        # Param√# tre physique learnable pour la force de la barri√# re
+        # Param?# tre physique learnable pour la force de la barri?# re
         self.elevation_barrier_strength = nn.Parameter(torch.tensor(3.0))
         
-        # Configuration patch level - pas de regroupement en r√©gions
+        # Configuration patch level - pas de regroupement en r??gions
         self.patch_size = 2  # Consistant avec l'architecture ClimaX
         
     def forward(self, x, elevation_patches=None):
@@ -52,7 +52,7 @@ class PhysicsGuidedAttentionPatchLevel(Attention):
         # Standard attention scores
         attn_scores = (q @ k.transpose(-2, -1)) * self.scale  # [B, H, N, N]
         
-        # Standard softmax # Üí attention weights normalis√©s [0,1]
+        # Standard softmax # ?? attention weights normalis??s [0,1]
         attn_weights = F.softmax(attn_scores, dim=-1)  # [B, H, N, N]
         
         # # # # #  PHYSICS-GUIDED PATCH-LEVEL MULTIPLICATIVE MASK
@@ -65,7 +65,7 @@ class PhysicsGuidedAttentionPatchLevel(Attention):
             # # # #  MULTIPLICATION pour masquage physique
             attn_weights_masked = attn_weights * elevation_mask_expanded  # [B, H, N, N]
             
-            # Re-normalisation pour que chaque ligne somme √#  1
+            # Re-normalisation pour que chaque ligne somme ?#  1
             attn_weights = attn_weights_masked / (attn_weights_masked.sum(dim=-1, keepdim=True) + 1e-8)
         
         # Dropout et application
@@ -83,7 +83,7 @@ class PhysicsGuidedAttentionPatchLevel(Attention):
         Compute elevation mask - VERSION PATCH LEVEL
         
         Args:
-            elevation_patches: [B, N] elevation per patch (d√©j√#  normalis√© [0,1])
+            elevation_patches: [B, N] elevation per patch (d??j?#  normalis?? [0,1])
             
         Returns:
             elevation_mask: [B, N, N] mask values # # #  [0,1]
@@ -94,15 +94,15 @@ class PhysicsGuidedAttentionPatchLevel(Attention):
         elev_i = elevation_patches.unsqueeze(2)  # [B, N, 1] - patch source
         elev_j = elevation_patches.unsqueeze(1)  # [B, 1, N] - patch destination
         
-        # 2. Diff√©rence directionnelle : positif = mont√©e (i# Üíj)
+        # 2. Diff??rence directionnelle : positif = mont??e (i# ??j)
         elevation_diff = elev_j - elev_i  # [B, N, N]
         
         # 3. # # # #  MASQUE MULTIPLICATIF avec sigmoid
-        # Transport montant # Üí masque faible (pr√# s de 0) = attention r√©duite
-        # Transport descendant # Üí masque fort (pr√# s de 1) = attention pr√©serv√©e
+        # Transport montant # ?? masque faible (pr?# s de 0) = attention r??duite
+        # Transport descendant # ?? masque fort (pr?# s de 1) = attention pr??serv??e
         elevation_mask = torch.sigmoid(-self.elevation_barrier_strength * elevation_diff)
         
-        # 4. Clamping pour stabilit√© num√©rique
+        # 4. Clamping pour stabilit?? num??rique
         elevation_mask = torch.clamp(elevation_mask, min=1e-6, max=1.0)
         
         return elevation_mask  # [B, N, N] # # #  [0,1]
@@ -139,7 +139,7 @@ class PhysicsGuidedBlockPatchLevel(nn.Module):
 
 class ElevationPatchProcessor:
     """
-    Processor pour calculer l'elevation par patch (pas par r√©gion).
+    Processor pour calculer l'elevation par patch (pas par r??gion).
     """
     
     @staticmethod
@@ -158,8 +158,8 @@ class ElevationPatchProcessor:
         device = elevation_field.device
         
         # Nombre de patches
-        patches_h = H // patch_size  # 64 pour 128√# 256
-        patches_w = W // patch_size  # 128 pour 128√# 256
+        patches_h = H // patch_size  # 64 pour 128?# 256
+        patches_w = W // patch_size  # 128 pour 128?# 256
         num_patches = patches_h * patches_w  # 8192
         
         # Calcul efficace par unfold
@@ -202,7 +202,7 @@ class ElevationPatchProcessor:
     def get_patch_distance(patch1_idx, patch2_idx, patches_h, patches_w):
         """
         Compute spatial distance between two patches.
-        Utile pour ajouter un biais de distance si n√©cessaire.
+        Utile pour ajouter un biais de distance si n??cessaire.
         """
         row1, col1 = ElevationPatchProcessor.get_patch_coordinates(patch1_idx, patches_h, patches_w)
         row2, col2 = ElevationPatchProcessor.get_patch_coordinates(patch2_idx, patches_h, patches_w)
@@ -227,9 +227,9 @@ def test_patch_level_physics_attention():
     num_patches = patches_h * patches_w  # 8192
     
     print(f"# # # #  Configuration:")
-    print(f"   Image: {H}√# {W}")
-    print(f"   Patch size: {patch_size}√# {patch_size}")
-    print(f"   Patches: {patches_h}√# {patches_w} = {num_patches}")
+    print(f"   Image: {H}?# {W}")
+    print(f"   Patch size: {patch_size}?# {patch_size}")
+    print(f"   Patches: {patches_h}?# {patches_w} = {num_patches}")
     
     # Create test data
     x = torch.randn(batch_size, num_patches, embed_dim)

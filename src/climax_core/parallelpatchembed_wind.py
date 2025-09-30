@@ -25,7 +25,7 @@ class ParallelVarPatchEmbedWind(nn.Module):
     """
     Variable to Patch Embedding with Wind-Following Scanning.
     
-    Key innovation: Reorder patches according to wind direction (upwind # †’ downwind)
+    Key innovation: Reorder patches according to wind direction (upwind # ?? downwind)
     Physical inductive bias for atmospheric transport modeling.
     
     Args:
