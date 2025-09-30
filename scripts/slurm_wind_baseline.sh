@@ -14,19 +14,29 @@
 # - NO innovations
 # - 6 epochs from scratch
 
-module purge
-module load LUMI/23.09
-module load partition/G
-module load rocm/5.6.1
-module load PyTorch/2.0.1-rocm-5.6.1-python-3.10-singularity-20231110
+# NO MODULE LOADING - Use venv PyTorch directly
+# (Loading Singularity module conflicts with venv)
 
+# ROCm/HIP configuration
+export ROCM_PATH=/opt/rocm
+export HIP_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export PYTORCH_HIP_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:256
+export HSA_FORCE_FINE_GRAIN_PCIE=1
+export MIOPEN_DISABLE_CACHE=1
+
+# MIOpen cache
 export MIOPEN_USER_DB_PATH=/scratch/project_462000640/ammar/miopen_cache
 export MIOPEN_CUSTOM_CACHE_DIR=$MIOPEN_USER_DB_PATH
+mkdir -p $MIOPEN_USER_DB_PATH
 
-# CD to project directory FIRST
+# PYTHONPATH
+export PYTHONPATH=/scratch/project_462000640/ammar/aq_net2/src:$PYTHONPATH
+export PYTHONPATH=/scratch/project_462000640/ammar/aq_net2:$PYTHONPATH
+
+# CD to project directory
 cd /scratch/project_462000640/ammar/aq_net2
 
-# Activate venv with absolute path
+# Activate venv (PyTorch is IN the venv, not from module)
 source /scratch/project_462000640/ammar/aq_net2/venv_pytorch_rocm/bin/activate
 
 srun python main_multipollutants.py --config configs/config_wind_baseline.yaml
