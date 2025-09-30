@@ -103,6 +103,13 @@ class ClimaX(nn.Module):
             else:
                 # Standard blocks
                 blocks.append(Block(
+                    embed_dim,
+                    num_heads,
+                    mlp_ratio,
+                    qkv_bias=True,
+                    drop_path=dpr[i],
+                    norm_layer=nn.LayerNorm,
+                ))
         self.blocks = nn.ModuleList(blocks)
         
         # Layer normalization after transformer blocks
@@ -148,6 +155,7 @@ class ClimaX(nn.Module):
         """
         x: (B, L, V * patch_size**2)
         return imgs: (B, V, H, W)
+        """
         p = self.patch_size
         c = len(self.default_vars)
         h = self.img_size[0] // p if h is None else h // p
@@ -160,7 +168,9 @@ class ClimaX(nn.Module):
         return imgs
 
     def aggregate_variables(self, x: torch.Tensor):
+        """
         x: B, V, L, D
+        """
         b, _, l, _ = x.shape
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
@@ -186,7 +196,9 @@ class ClimaX(nn.Module):
         embeds = []
         var_ids = self.get_var_ids(variables, x.device)
 
+        if self.parallel_patch_embed:
             x = self.token_embeds(x, var_ids)  # B, V, L, D
+        else:
             for i in range(len(var_ids)):
                 id = var_ids[i]
                 embeds.append(self.token_embeds[id](x[:, i : i + 1]))
@@ -209,15 +221,17 @@ class ClimaX(nn.Module):
 
         x = self.pos_drop(x)
 
-        # apply Transformer blocks
         # apply Transformer blocks with physics bias for first block
         for i, blk in enumerate(self.blocks):
+            if i == 0:
                 # First block: compute and apply physics bias
                 elevation_patches = self._compute_elevation_patches(x_input, variables)
                 x = blk(x, elevation_patches)
+            else:
                 x = blk(x)
         x = self.norm(x)
 
+        return x
 
     def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
         """Forward pass through the model.
@@ -230,6 +244,7 @@ class ClimaX(nn.Module):
         Returns:
             loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
+        """
         out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
         preds = self.head(out_transformers)  # B, L, V*p*p
 
@@ -245,13 +260,15 @@ class ClimaX(nn.Module):
 
 
     def _compute_elevation_patches(self, x_input: torch.Tensor, variables: tuple) -> torch.Tensor:
+        """
         Compute elevation per patch for patch-level physics attention.
         Higher granularity: each 2x2 patch has its own elevation.
-        
+
             x_input: [B, V, H, W] raw meteorological data
             variables: tuple of variable names
-        
+
             elevation_patches: [B, N] normalized elevation per patch where N=num_patches
+        """
         # Find elevation index
         try:
             elev_idx = variables.index("elevation")
