@@ -90,7 +90,7 @@ class PM25AirQualityDataset(Dataset):
                 
                 print(f"   # # #  Loaded {len(ds.time)} timesteps from {year}")
             else:
-                print(f"   # ù#  Missing: {zarr_path}")
+                print(f"   # # #  Missing: {zarr_path}")
 
     def _prepare_downsampling(self, ds):
         """Pr√©parer automatiquement le downsampling et les grilles de coordonn√©es"""
@@ -107,15 +107,15 @@ class PM25AirQualityDataset(Dataset):
         sample_data = ds[sample_var].isel(time=0)
         self.current_h, self.current_w = sample_data.shape
         
-        print(f"   # # # ê Original resolution: {self.current_h}√# {self.current_w}")
-        print(f"   # # # ê Target resolution: {self.target_h}√# {self.target_w}")
+        print(f"   # # # ÔøΩ Original resolution: {self.current_h}ÔøΩ# {self.current_w}")
+        print(f"   # # # ÔøΩ Target resolution: {self.target_h}ÔøΩ# {self.target_w}")
         print(f"   # # # #  Using bilinear interpolation for downsampling")
         
-        # Cr√©er les grilles de coordonn√©es √#  la r√©solution cible
+        # Cr√©er les grilles de coordonn√©es ÔøΩ#  la r√©solution cible
         self._create_coordinate_grids(ds)
 
     def _create_coordinate_grids(self, ds):
-        """Cr√©er les grilles de coordonn√©es automatiquement √#  la taille cible"""
+        """Cr√©er les grilles de coordonn√©es automatiquement ÔøΩ#  la taille cible"""
         if 'lat2d' in ds.coords and 'lon2d' in ds.coords:
             # Extraire les coordonn√©es 1D originales
             lat_1d_orig = ds.coords['lat2d'].values  # (current_h,)
@@ -128,13 +128,13 @@ class PM25AirQualityDataset(Dataset):
             lat_1d = np.interp(lat_indices, np.arange(len(lat_1d_orig)), lat_1d_orig)
             lon_1d = np.interp(lon_indices, np.arange(len(lon_1d_orig)), lon_1d_orig)
             
-            # Cr√©er les grilles 2D √#  la r√©solution cible
+            # Cr√©er les grilles 2D ÔøΩ#  la r√©solution cible
             lon_grid, lat_grid = np.meshgrid(lon_1d, lat_1d)  # (target_h, target_w)
             
             self.lat_grid = lat_grid.astype(np.float32)
             self.lon_grid = lon_grid.astype(np.float32)
             
-            print(f"   # # # ç Coordinate grids created: lat=({self.lat_grid.shape}), lon=({self.lon_grid.shape})")
+            print(f"   # # # ÔøΩ Coordinate grids created: lat=({self.lat_grid.shape}), lon=({self.lon_grid.shape})")
         else:
             self.lat_grid = None
             self.lon_grid = None
@@ -216,17 +216,17 @@ class PM25AirQualityDataset(Dataset):
                 input_vars.append(var_data.numpy())
                 
             elif var == 'lat2d' and self.lat_grid is not None:
-                # Grille latitude (d√©j√#  √#  la bonne taille)
+                # Grille latitude (d√©jÔøΩ#  ÔøΩ#  la bonne taille)
                 input_vars.append(self.lat_grid)
                 
             elif var == 'lon2d' and self.lon_grid is not None:
-                # Grille longitude (d√©j√#  √#  la bonne taille)
+                # Grille longitude (d√©jÔøΩ#  ÔøΩ#  la bonne taille)
                 input_vars.append(self.lon_grid)
         
         # Stack des variables: [n_vars, target_h, target_w]
         input_data = np.stack(input_vars, axis=0)
         
-        # Variables cibles avec m√# me downsampling - SUPPORT MULTI-POLLUANTS
+        # Variables cibles avec mÔøΩ# me downsampling - SUPPORT MULTI-POLLUANTS
         target_t = t + forecast_hours
         target_data_list = []
         for target_var in self.target_variables:
