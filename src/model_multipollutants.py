@@ -11,6 +11,7 @@ from typing import Tuple
 
 from src.climax_core.arch import ClimaX
 from src.models.pollutant_cross_attn import PollutantCrossAttentionWrapper
+from src.models.hierarchical_physics import HierarchicalPhysicsTransformer
 
 
 def ensure_tuple(variables):
@@ -87,6 +88,20 @@ class MultiPollutantModel(nn.Module):
         else:
             print(f"# # # #  Pollutant Cross-Attention: DISABLED")
 
+        # Innovation #2: Hierarchical Multi-Scale Physics (optional)
+        self.use_hierarchical_physics = config.get("model", {}).get("use_hierarchical_physics", False)
+        if self.use_hierarchical_physics:
+            self.hierarchical_physics = HierarchicalPhysicsTransformer(
+                embed_dim=config["model"]["embed_dim"],
+                img_size=self.img_size,
+                patch_size=self.patch_size,
+                scales=config.get("model", {}).get("physics_scales", [1, 2, 4]),
+                num_layers=config.get("model", {}).get("hierarchical_layers", 1)
+            )
+            print(f"# # # # # #  INNOVATION #2 ACTIVE: Hierarchical Multi-Scale Physics")
+        else:
+            print(f"# # # #  Hierarchical Multi-Scale Physics: DISABLED")
+
     def forward(self, x, lead_times, variables, out_variables=None):
         if out_variables is None:
             out_variables = self.variables
@@ -94,6 +109,10 @@ class MultiPollutantModel(nn.Module):
         # Forward through transformer encoder
         outs = self.climax.forward_encoder(x, lead_times, ensure_tuple(variables))  # [B, L, D]
         outs_original = outs.clone()  # Store for residual
+
+        # Innovation #2: Hierarchical Multi-Scale Physics
+        if self.use_hierarchical_physics:
+            outs = self.hierarchical_physics(outs)  # [B, L, D]
 
         # Innovation #1: Pollutant Cross-Attention
         if self.use_pollutant_cross_attn:
