@@ -1,11 +1,11 @@
 # TopoFlow - FULL MODEL: All 3 Innovations
 #
-# Complete TopoFlow model with all innovations:
+# Complete TopoFlow model with all innovations from scratch:
+# - Wind scanning 32×32
 # - Innovation #1: Pollutant Cross-Attention
 # - Innovation #2: Hierarchical Multi-Scale Physics
 # - Innovation #3: Adaptive Wind Memory
-# - Quick 1-epoch validation test
-# - Eval on 1000 samples per horizon
+# - Training for 6 epochs
 # - Project: 462001079 (LUMI)
 #
 train:
@@ -15,18 +15,16 @@ train:
   learning_rate: 0.000150
   weight_decay: 0.01
   devices: 8
-  num_nodes: 10  # Reduced for quick test
+  num_nodes: 50  # 400 GPUs
   accelerator: gpu
   strategy: ddp
   precision: 32
   gradient_clip_val: 1.0
-  log_every_n_steps: 25
-  val_check_interval: 50
-  max_steps: 1000  # Quick 1-epoch test
-  epochs: 1
-  warmup_steps: 100
+  log_every_n_steps: 50
+  val_check_interval: 100
+  epochs: 6
+  warmup_steps: 500
   scheduler: cosine
-  cosine_max_steps: 1000
 callbacks:
   early_stopping:
     monitor: val_loss
@@ -105,11 +103,10 @@ model:
   drop_path: 0.1
   drop_rate: 0.1
   parallel_patch_embed: true
-  # Fine-tuning from baseline checkpoint
-  checkpoint_path: logs/multipollutants_climax_ddp/version_22/checkpoints/EO_val_loss_0.264.ckpt
+  # ALL 3 INNOVATIONS (from scratch)
   # Innovation #1: Pollutant Cross-Attention
   use_pollutant_cross_attn: true
-  cross_attn_layers: 2  # Number of cross-attention layers
+  cross_attn_layers: 2
   # Innovation #2: Hierarchical Multi-Scale Physics
   use_hierarchical_physics: true
   physics_scales: [1, 2, 4]  # Local, regional, synoptic
@@ -122,8 +119,8 @@ system:
   miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:
   logger:
-    name: TopoFlow_FULL_MODEL_All3Innovations
-    project: topoflow_ablation
+    name: TopoFlow_FULL_Wind+All3Innovations
+    project: topoflow_ablation_fromscratch
   trainer:
     default_root_dir: ./lightning_logs
     enable_checkpointing: true

@@ -1,20 +1,18 @@
 #!/bin/bash
-#SBATCH --job-name=topoflow_wind_full
+#SBATCH --job-name=topoflow_wind_baseline
 #SBATCH --account=project_462001079
 #SBATCH --partition=standard-g
 #SBATCH --nodes=50
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
 #SBATCH --time=18:00:00
-#SBATCH --output=logs/topoflow_wind_full_%j.out
-#SBATCH --error=logs/topoflow_wind_full_%j.err
+#SBATCH --output=logs/topoflow_wind_baseline_%j.out
+#SBATCH --error=logs/topoflow_wind_baseline_%j.err
 
-# TopoFlow Wind + FULL MODEL: All 3 Innovations
-# - Wind Scanning 32×32
-# - Pollutant Cross-Attention
-# - Hierarchical Multi-Scale Physics
-# - Adaptive Wind Memory
-# From scratch, 6 epochs
+# TopoFlow Wind Scanning Baseline (from scratch)
+# - Wind scanning 32×32 ONLY
+# - NO innovations
+# - 6 epochs from scratch
 
 module purge
 module load LUMI/23.09
@@ -27,6 +25,6 @@ export MIOPEN_CUSTOM_CACHE_DIR=$MIOPEN_USER_DB_PATH
 
 source venv_pytorch_rocm/bin/activate
 
-srun python main_multipollutants.py --config configs/config_full_model.yaml
+srun python main_multipollutants.py --config configs/config_wind_baseline.yaml
 
-echo "Wind + Full TopoFlow model training completed!"
+echo "Wind Scanning Baseline training completed!"

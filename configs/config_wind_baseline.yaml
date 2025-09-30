@@ -1,10 +1,8 @@
-# TopoFlow - Innovation #1 + #2: Wind + Cross-Attention + Hierarchical Physics
+# TopoFlow - Wind Scanning Baseline (from scratch)
 #
-# Training from scratch for 6 epochs:
-# - Wind scanning 32×32
-# - + Pollutant Cross-Attention
-# - + Hierarchical Multi-Scale Physics
-# - Project: 462001079 (LUMI)
+# Baseline avec wind scanning 32×32 SANS innovations
+# Training from scratch pour 6 époques
+# Project: 462001079 (LUMI)
 #
 train:
   batch_size: 2
@@ -32,7 +30,7 @@ callbacks:
     monitor: val_loss
     mode: min
     save_top_k: 3
-    filename: best-val_loss_{val_loss:.4f}-step_{step}
+    filename: best-val_loss_{val_loss:.4f}-epoch_{epoch}
     save_last: true
 data:
   data_path: ./data_processed/
@@ -101,20 +99,15 @@ model:
   drop_path: 0.1
   drop_rate: 0.1
   parallel_patch_embed: true
-  # Innovation #1: Pollutant Cross-Attention (from scratch)
-  use_pollutant_cross_attn: true
-  cross_attn_layers: 2  # Number of cross-attention layers
-  # Innovation #2: Hierarchical Multi-Scale Physics (from scratch)
-  use_hierarchical_physics: true
-  physics_scales: [1, 2, 4]  # Local, regional, synoptic
-  hierarchical_layers: 1
-  # No adaptive wind (yet)
+  # NO INNOVATIONS - Wind scanning baseline only
+  use_pollutant_cross_attn: false
+  use_hierarchical_physics: false
   use_adaptive_wind_memory: false
 system:
   miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:
   logger:
-    name: TopoFlow_Wind+Innovation1+2_Hierarchical
+    name: TopoFlow_WindScanning_Baseline
     project: topoflow_ablation_fromscratch
   trainer:
     default_root_dir: ./lightning_logs

@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=topoflow_innov2
+#SBATCH --job-name=topoflow_wind_innov2
 #SBATCH --account=project_462001079
 #SBATCH --partition=standard-g
-#SBATCH --nodes=10
+#SBATCH --nodes=50
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
-#SBATCH --time=02:00:00
-#SBATCH --output=logs/topoflow_innovation2_%j.out
-#SBATCH --error=logs/topoflow_innovation2_%j.err
+#SBATCH --time=18:00:00
+#SBATCH --output=logs/topoflow_wind_innov2_%j.out
+#SBATCH --error=logs/topoflow_wind_innov2_%j.err
 
-# TopoFlow Innovation #1+#2: Cross-Attention + Hierarchical Physics
-# Quick 1-epoch test
+# TopoFlow Wind + INNOVATION #1+#2: CrossAttn + Hierarchical
+# From scratch, 6 epochs
 
 module purge
 module load LUMI/23.09
@@ -25,4 +25,4 @@ source venv_pytorch_rocm/bin/activate
 
 srun python main_multipollutants.py --config configs/config_innovation2.yaml
 
-echo "Innovation #1+#2 training completed!"
+echo "Wind + Innovation #1+#2 training completed!"
