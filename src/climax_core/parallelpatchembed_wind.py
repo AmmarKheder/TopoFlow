@@ -82,12 +82,15 @@ class ParallelVarPatchEmbedWind(nn.Module):
 
     def _ensure_wind_scanner(self, L_expected, num_sectors=16):
         """Ensure wind scanner is initialized for current grid configuration."""
-        if (self.wind_scanner is None or 
+        if (self.wind_scanner is None or
             self.wind_scanner.grid_h != self.grid_h or
             self.wind_scanner.grid_w != self.grid_w or
             self.wind_scanner.num_patches != L_expected):
-            
-            print(f"# # # #  Initializing wind scanner cache for {self.grid_h}x{self.grid_w} grid ({L_expected} patches)")
+
+            # Only print on rank 0 to avoid spam from 400 ranks
+            import torch.distributed as dist
+            if not dist.is_initialized() or dist.get_rank() == 0:
+                print(f"Initializing wind scanner cache for {self.grid_h}x{self.grid_w} grid ({L_expected} patches)")
             # CPU-only initialization to avoid device conflicts
             self.wind_scanner = CachedWindScanning(self.grid_h, self.grid_w, num_sectors=num_sectors)
     

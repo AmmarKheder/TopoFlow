@@ -65,8 +65,11 @@ class CachedWindScanning:
         print(f"# # #  Pre-computed {len(self.cached_orders)} sector orderings!")
 
     def _precompute_regional_orders_32x32(self):
-        """Pre-compute patch reordering for all regions ?#  16 wind sectors."""
-        print(f"# # # #  Pre-computing regional cache: regions ?#  {self.num_sectors} sectors...")
+        """Pre-compute patch reordering for all regions for 16 wind sectors."""
+        # Print only on rank 0
+        import torch.distributed as dist
+        if not dist.is_initialized() or dist.get_rank() == 0:
+            print(f"Pre-computing regional cache: regions x {self.num_sectors} sectors...")
         
         # Calculate regional dimensions
         region_h, region_w = self.grid_h // self.regions_h, self.grid_w // self.regions_w  # patches per region
@@ -99,7 +102,9 @@ class CachedWindScanning:
                                              dtype=torch.long)
                 self.regional_cached_orders[region_idx][sector_idx] = reorder_indices
         
-        print(f"# # #  Regional cache ready: {len(self.regional_cached_orders)} regions ?#  {self.num_sectors} sectors!")
+        # Print only on rank 0
+        if not dist.is_initialized() or dist.get_rank() == 0:
+            print(f"Regional cache ready: {len(self.regional_cached_orders)} regions x {self.num_sectors} sectors!")
     
     def _get_patch_coordinates(self, patch_idx: int) -> Tuple[int, int]:
         """Convert patch index to (row, col) coordinates."""
