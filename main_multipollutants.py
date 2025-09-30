@@ -24,7 +24,7 @@ def main(config_path):
           f"(LOCAL_RANK={os.environ.get('LOCAL_RANK')}, "
           f"SLURM_LOCALID={os.environ.get('SLURM_LOCALID')})")
     
-    print("# # # #  D√# MARRAGE AQ_NET2 - PR√# DICTION MULTI-POLLUANTS")
+    print("# # # #  DÔøΩ# MARRAGE AQ_NET2 - PRÔøΩ# DICTION MULTI-POLLUANTS")
     
     # Initial setup
     cfg_mgr = ConfigManager(config_path)
@@ -34,19 +34,34 @@ def main(config_path):
     print(f"# # # #  R√©solution: {config['model']['img_size']}")
     print(f"# # # #  Variables: {len(config['data']['variables'])}")
     print(f"# # # #  Cibles: {config['data']['target_variables']} ({len(config['data']['target_variables'])} polluants)")
-    print("# # # # # # # #  MASQUE CHINE ACTIV√#  dans la loss function")
+    print("# # # # # # # #  MASQUE CHINE ACTIVÔøΩ#  dans la loss function")
     
     # Initialize Data Module
     print("# # # #  Initialisation du DataModule...")
     data_module = AQNetDataModule(config)
     
-    # TRANSFER LEARNING: Initialize Model from EO checkpoint
-    print("# # # #  Initialisation du mod√# le multi-polluants...")
-    # Load EO checkpoint for transfer learning
-    checkpoint_path = "logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt"
-    print(f"# # # #  Loading EO checkpoint: {checkpoint_path}")
-    model = PM25LightningModule.load_from_checkpoint(checkpoint_path, config=config, strict=False)
-    print("# # #  Mod√# le multi-polluants initialis√©")
+    # Initialize Model (with optional checkpoint loading)
+    print("# # # #  Initialisation du mod√®le multi-polluants...")
+
+    # Check if checkpoint path is provided in config
+    checkpoint_path = config.get('model', {}).get('checkpoint_path', None)
+
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        print(f"# # # #  Loading from checkpoint: {checkpoint_path}")
+        print("# # # #  Mode: Fine-tuning (strict=False allows new modules)")
+        model = PM25LightningModule.load_from_checkpoint(
+            checkpoint_path,
+            config=config,
+            strict=False  # Allow adding new innovations
+        )
+        print("# # # #  Checkpoint loaded successfully (innovations will be randomly initialized)")
+    else:
+        if checkpoint_path:
+            print(f"# # # #  WARNING: Checkpoint not found: {checkpoint_path}")
+        print("# # # #  Creating new model from scratch...")
+        model = PM25LightningModule(config=config)
+
+    print("# # # #  Mod√®le multi-polluants initialis√©")
     
     # Loggers (TensorBoard + CSV)
     print("# # # #  Configuration des loggers (TensorBoard + CSV)...")
@@ -100,11 +115,11 @@ def main(config_path):
     )
     
     print("\n" + "="*60)
-    print("# # # É# # ç# # # # # #  D√# MARRAGE DE L'ENTRA√# NEMENT MULTI-POLLUANTS")
+    print("# # # ÔøΩ# # ÔøΩ# # # # # #  DÔøΩ# MARRAGE DE L'ENTRAÔøΩ# NEMENT MULTI-POLLUANTS")
     print("="*60)
     print(f"# # # #  Polluants: {', '.join(config['data']['target_variables'])}")
     print(f"# # # #  Horizons: {config['data']['forecast_hours']} heures")
-    print(f"# # ° GPUs: {config['train']['devices']}")
+    print(f"# # ÔøΩ GPUs: {config['train']['devices']}")
     print(f"# # # #  Batch size: {config['train']['batch_size']} par GPU")
     print("# # # #  SANITY CHECK: 1 step seulement (debug device mismatch)")
     print("="*60 + "\n")
@@ -112,7 +127,7 @@ def main(config_path):
     # Start training
     trainer.fit(model, data_module)
     
-    print("\n# # # #  ENTRA√# NEMENT TERMIN√# !")
+    print("\n# # # #  ENTRAÔøΩ# NEMENT TERMINÔøΩ# !")
     
     # ============================================
     # # # # #  LANCEMENT AUTOMATIQUE DES TESTS
@@ -121,7 +136,7 @@ def main(config_path):
     print("# # # #  LANCEMENT AUTOMATIQUE DU TEST (2018)")
     print("="*60)
     print("# # # #  Recherche du meilleur checkpoint...")
-    print("# # # #  √# valuation sur l'ann√©e test 2018...")
+    print("# # # #  ÔøΩ# valuation sur l'ann√©e test 2018...")
     print("="*60 + "\n")
     
     try:
@@ -147,7 +162,7 @@ def main(config_path):
         )
         
         if result.returncode == 0:
-            print("# # #  √# VALUATION TEST R√# USSIE!")
+            print("# # #  ÔøΩ# VALUATION TEST RÔøΩ# USSIE!")
             print("# # # #  R√©sultats du test:")
             print(result.stdout)
         else:
@@ -157,12 +172,12 @@ def main(config_path):
             print(f"Code de retour: {result.returncode}")
             
     except Exception as e:
-        print(f"# ù#  ERREUR lors du lancement automatique du test: {str(e)}")
+        print(f"# ÔøΩ#  ERREUR lors du lancement automatique du test: {str(e)}")
         print("# # # #  Vous pouvez lancer le test manuellement avec:")
         print(f"python scripts/auto_test_after_training.py --config {config_path} --log_dir logs/multipollutants_climax_ddp")
     
     print("\n" + "="*60)
-    print("# # # #  PIPELINE COMPLET TERMIN√#  (ENTRA√# NEMENT + TEST)")
+    print("# # # #  PIPELINE COMPLET TERMINÔøΩ#  (ENTRAÔøΩ# NEMENT + TEST)")
     print("="*60)
 
 

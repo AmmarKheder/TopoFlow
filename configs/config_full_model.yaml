@@ -105,6 +105,8 @@ model:
   drop_path: 0.1
   drop_rate: 0.1
   parallel_patch_embed: true
+  # Fine-tuning from baseline checkpoint
+  checkpoint_path: logs/multipollutants_climax_ddp/version_22/checkpoints/EO_val_loss_0.264.ckpt
   # Innovation #1: Pollutant Cross-Attention
   use_pollutant_cross_attn: true
   cross_attn_layers: 2  # Number of cross-attention layers
