@@ -10,6 +10,7 @@ import numpy as np
 from typing import Tuple
 
 from src.climax_core.arch import ClimaX
+from src.models.pollutant_cross_attn import PollutantCrossAttentionWrapper
 
 
 def ensure_tuple(variables):
@@ -59,10 +60,70 @@ class MultiPollutantModel(nn.Module):
                 raise ValueError(f"Target variable '{target}' not in inputs")
         self.register_buffer("target_indices", torch.tensor(idxs, dtype=torch.long))
 
+        # Innovation #1: Pollutant Cross-Attention (optional)
+        self.use_pollutant_cross_attn = config.get("model", {}).get("use_pollutant_cross_attn", False)
+        if self.use_pollutant_cross_attn:
+            embed_dim = config["model"]["embed_dim"]
+            num_pollutants = len(self.target_variables)
+
+            # Projection layers to extract pollutant-specific features
+            self.pollutant_projections = nn.ModuleList([
+                nn.Linear(embed_dim, embed_dim) for _ in range(num_pollutants)
+            ])
+
+            # Cross-attention module
+            self.pollutant_cross_attn = PollutantCrossAttentionWrapper(
+                embed_dim=embed_dim,
+                num_pollutants=num_pollutants,
+                num_heads=config["model"]["num_heads"],
+                num_layers=config.get("model", {}).get("cross_attn_layers", 2),
+                dropout=config.get("model", {}).get("drop_rate", 0.1)
+            )
+
+            # Fusion layer to combine cross-attended features
+            self.cross_attn_fusion = nn.Linear(embed_dim * num_pollutants, embed_dim)
+
+            print(f"# # # # # #  INNOVATION #1 ACTIVE: Pollutant Cross-Attention with {num_pollutants} pollutants")
+        else:
+            print(f"# # # #  Pollutant Cross-Attention: DISABLED")
+
     def forward(self, x, lead_times, variables, out_variables=None):
         if out_variables is None:
             out_variables = self.variables
-        outs = self.climax.forward_encoder(x, lead_times, ensure_tuple(variables))
+
+        # Forward through transformer encoder
+        outs = self.climax.forward_encoder(x, lead_times, ensure_tuple(variables))  # [B, L, D]
+        outs_original = outs.clone()  # Store for residual
+
+        # Innovation #1: Pollutant Cross-Attention
+        if self.use_pollutant_cross_attn:
+            B, L, D = outs.shape
+
+            # Extract pollutant-specific features via projections
+            pollutant_features = []
+            for i, proj in enumerate(self.pollutant_projections):
+                # Project shared features to pollutant-specific space
+                pol_feat = proj(outs)  # [B, L, D]
+                pollutant_features.append(pol_feat)
+
+            # Stack: [B, num_pollutants, L, D]
+            pollutant_features = torch.stack(pollutant_features, dim=1)
+
+            # Apply cross-attention between pollutants
+            pollutant_features_cross, _ = self.pollutant_cross_attn(
+                pollutant_features,
+                return_attn_weights=False
+            )  # [B, num_pollutants, L, D]
+
+            # Fuse cross-attended features back to shared space
+            pollutant_features_flat = pollutant_features_cross.permute(0, 2, 1, 3)  # [B, L, num_pollutants, D]
+            pollutant_features_flat = pollutant_features_flat.reshape(B, L, -1)  # [B, L, num_pollutants*D]
+            outs = self.cross_attn_fusion(pollutant_features_flat)  # [B, L, D]
+
+            # Residual connection
+            outs = outs + outs_original
+
+        # Standard prediction head
         preds = self.climax.head(outs)
         preds = self.climax.unpatchify(preds)  # [B, V, H, W]
         return preds.index_select(1, self.target_indices.to(preds.device))
@@ -101,7 +162,7 @@ class MultiPollutantLightningModule(pl.LightningModule):
             print(f"# # # #  China/Taiwan mask loaded: {cover}/{t.numel()} pixels ({100.0*cover/t.numel():.2f}%)")
             return t
         except Exception as e:
-            print(f"# # # # # #  china_mask load failed: {e} # Üí fallback rectangle")
+            print(f"# # # # # #  china_mask load failed: {e} # ÔøΩÔøΩ fallback rectangle")
             t = torch.zeros(H, W, dtype=torch.float32)
             t[30:100, 45:180] = 1.0
             return t
@@ -292,7 +353,7 @@ class MultiPollutantLightningModule(pl.LightningModule):
 
     # ----------------- TEST -----------------
     def test_step(self, batch, batch_idx):
-        """Test step ULTRA SIMPLIFI√#  - QUI MARCHE!"""
+        """Test step ULTRA SIMPLIFIÔøΩ#  - QUI MARCHE!"""
         
         # Parsing batch robuste
         if len(batch) == 3:
@@ -331,22 +392,22 @@ class MultiPollutantLightningModule(pl.LightningModule):
 
 
     def on_test_epoch_end(self):
-        """Appel√© √#  la fin de l'√©valuation test."""
+        """Appel√© ÔøΩ#  la fin de l'√©valuation test."""
         print("\n" + "="*60)
-        print("# # # #  √# VALUATION TEST TERMIN√# E (2018)")
+        print("# # # #  ÔøΩ# VALUATION TEST TERMINÔøΩ# E (2018)")
         print("="*60)
         
         # R√©cup√©rer les m√©triques logg√©es
         logged_metrics = self.trainer.logged_metrics
         
-        print("\n# # # #  R√# SULTATS PAR POLLUANT:")
+        print("\n# # # #  RÔøΩ# SULTATS PAR POLLUANT:")
         for pollutant in self.target_variables:
             rmse_key = f"test_rmse_{pollutant}"
             if rmse_key in logged_metrics:
                 rmse_val = logged_metrics[rmse_key].item()
                 print(f"  {pollutant.upper()}: RMSE = {rmse_val:.4f}")
         
-        print("\n# # # #  R√# SULTATS PAR HORIZON:")
+        print("\n# # # #  RÔøΩ# SULTATS PAR HORIZON:")
         forecast_hours = self.config.get('data', {}).get('forecast_hours', [12, 24, 48, 96])
         for h in forecast_hours:
             rmse_key = f"test_rmse_h{h}"
@@ -354,7 +415,7 @@ class MultiPollutantLightningModule(pl.LightningModule):
                 rmse_val = logged_metrics[rmse_key].item()
                 print(f"  {h}h: RMSE = {rmse_val:.4f}")
         
-        print("\n# # # #  R√# SULTATS D√# TAILL√# S (POLLUANT √#  HORIZON):")
+        print("\n# # # #  RÔøΩ# SULTATS DÔøΩ# TAILLÔøΩ# S (POLLUANT ÔøΩ#  HORIZON):")
         for pollutant in self.target_variables:
             print(f"\n  {pollutant.upper()}:")
             for h in forecast_hours:
@@ -368,9 +429,9 @@ class MultiPollutantLightningModule(pl.LightningModule):
 
 
     def on_fit_end(self):
-        """Appel√© √#  la fin de l'entra√Ænement pour lancer test automatique."""
+        """Appel√© ÔøΩ#  la fin de l'entra√Ænement pour lancer test automatique."""
         print("\n" + "="*60)
-        print("# # # #  ENTRA√# NEMENT TERMIN√#  - LANCEMENT TEST AUTOMATIQUE")
+        print("# # # #  ENTRAÔøΩ# NEMENT TERMINÔøΩ#  - LANCEMENT TEST AUTOMATIQUE")
         print("="*60)
         
         try:
@@ -384,7 +445,7 @@ class MultiPollutantLightningModule(pl.LightningModule):
                 if checkpoint_dirs:
                     checkpoint_dir = checkpoint_dirs[-1]  # Plus r√©cent
                 else:
-                    print("# ù#  Impossible de trouver le dossier checkpoints")
+                    print("# ÔøΩ#  Impossible de trouver le dossier checkpoints")
                     return
             
             print(f"# # # #  Dossier checkpoints: {checkpoint_dir}")
@@ -392,7 +453,7 @@ class MultiPollutantLightningModule(pl.LightningModule):
             # Trouver le meilleur checkpoint
             checkpoints = list(checkpoint_dir.glob("*.ckpt"))
             if not checkpoints:
-                print("# ù#  Aucun checkpoint trouv√©")
+                print("# ÔøΩ#  Aucun checkpoint trouv√©")
                 return
                 
             print(f"# # # #  Checkpoints trouv√©s: {len(checkpoints)}")
@@ -426,7 +487,7 @@ class MultiPollutantLightningModule(pl.LightningModule):
                 best_checkpoint = max(checkpoints, key=lambda x: x.stat().st_mtime)
                 print("# # # # # #  Prise du checkpoint le plus r√©cent")
             
-            print(f"# # # Ü Meilleur checkpoint: {best_checkpoint.name}")
+            print(f"# # # ÔøΩ Meilleur checkpoint: {best_checkpoint.name}")
             print(f"# # # #  M√©trique: {best_metric:.4f}")
             
             # Supprimer les autres checkpoints (garder seulement le meilleur)
@@ -443,11 +504,11 @@ class MultiPollutantLightningModule(pl.LightningModule):
             # Lancer le test automatiquement
             print("\n# # # #  LANCEMENT TEST AUTOMATIQUE...")
             
-            # Charger le mod√# le depuis le meilleur checkpoint  
+            # Charger le modÔøΩ# le depuis le meilleur checkpoint  
             from src.model_multipollutants import MultiPollutantLightningModule
             model = MultiPollutantLightningModule.load_from_checkpoint(str(best_checkpoint), config=self.config)
             
-            # Cr√©er nouveau trainer pour test (m√# me config GPU)
+            # Cr√©er nouveau trainer pour test (mÔøΩ# me config GPU)
             import pytorch_lightning as pl
             test_trainer = pl.Trainer(
                 devices=self.trainer.num_devices,
@@ -465,11 +526,11 @@ class MultiPollutantLightningModule(pl.LightningModule):
             # Lancer test
             test_trainer.test(model, data_module)
             
-            print("\n# # #  TEST AUTOMATIQUE TERMIN√# !")
+            print("\n# # #  TEST AUTOMATIQUE TERMINÔøΩ# !")
             print("="*60)
             
         except Exception as e:
-            print(f"# ù#  Erreur test automatique: {e}")
+            print(f"# ÔøΩ#  Erreur test automatique: {e}")
             import traceback
             traceback.print_exc()
 
