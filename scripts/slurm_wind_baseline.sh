@@ -23,7 +23,11 @@ module load PyTorch/2.0.1-rocm-5.6.1-python-3.10-singularity-20231110
 export MIOPEN_USER_DB_PATH=/scratch/project_462000640/ammar/miopen_cache
 export MIOPEN_CUSTOM_CACHE_DIR=$MIOPEN_USER_DB_PATH
 
-source venv_pytorch_rocm/bin/activate
+# CD to project directory FIRST
+cd /scratch/project_462000640/ammar/aq_net2
+
+# Activate venv with absolute path
+source /scratch/project_462000640/ammar/aq_net2/venv_pytorch_rocm/bin/activate
 
 srun python main_multipollutants.py --config configs/config_wind_baseline.yaml
 
