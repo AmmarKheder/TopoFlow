@@ -108,3 +108,4 @@ venv_pytorch_rocm/
 configs/*.backup*
 src/*.backup*
 scripts/*.backup*
+core
