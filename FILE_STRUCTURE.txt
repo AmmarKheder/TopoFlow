@@ -1,0 +1,36 @@
+AQ_NET2 PROJECT STRUCTURE
+========================
+
+ROOT FILES
+----------
+main_multipollutants.py          - Main training entry point
+submit_multipollutants_*.sh      - SLURM submission scripts  
+checkpoint_best_val_loss_*.ckpt  - Best model checkpoint
+
+DIRECTORIES
+-----------
+src/                    - Source code
+  ├── dataloader.py           - Dataset loading with NORM_STATS
+  ├── datamodule_fixed.py     - Lightning DataModule
+  ├── model_multipollutants.py - Lightning Module wrapper
+  ├── config_manager.py       - Config file parser
+  ├── wind_scanning_cached.py - Wind-guided scanning algorithm
+  └── climax_core/           - Core model architecture
+      ├── arch.py                      - Main ClimaX architecture
+      ├── parallelpatchembed_wind.py   - Patch embedding with wind scanning
+      ├── physics_attention_patch_level.py - Terrain-aware attention
+      └── utils/pos_embed.py           - Positional embeddings
+
+configs/                - Configuration files
+  └── config_all_pollutants.yaml - Main training config
+
+scripts/                - Execution scripts
+  ├── run_multipollutants_from_scratch.sh - Training wrapper
+  └── auto_test_after_training.py        - Automatic evaluation
+
+data_processed/         - Zarr data files (2013-2018)
+logs/                   - Training logs and checkpoints
+archive/                - Archived/backup files
+docs/                   - Documentation
+venv_pytorch_rocm/      - Python virtual environment
+

@@ -1,53 +1,101 @@
-# AQ_Net2 - Configuration Zarr optimisée avec DDP 4 GPUs
-
-# Training settings - DDP 4 GPUs
+# ClimaX Baseline - Steps-based Training + Auto Test
+# 
+# Configuration pour comparaison propre basée sur optimizer steps
+# - Baseline: Row-major scanning (ClimaX original)  
+# - K_main = 20k steps
+# - Warmup = 2k steps, puis cosine LR jusqu'à 20k
+# - clip_grad_norm = 1.0, checkpoints/logs toutes les 1k steps
+# - Garde seulement le meilleur checkpoint (val_rmse)
+# - Test automatique à la fin sur 2018 (même GPUs)
+#
 train:
-  epochs: 20
-  batch_size: 2                        # Batch par GPU
-  accumulate_grad_batches: 4          # Total batch size = 2×4×4 = 32
+  batch_size: 2
+  accumulate_grad_batches: 4
   val_batch_size: 2
-  learning_rate: 0.0001
+  learning_rate: 0.000150
   weight_decay: 0.01
-  devices: 4                          # 4 GPUs per node
-  accelerator: 'gpu'
-  strategy: 'ddp'                     # DDP strategy
-  precision: 32                       # Full precision training
+  devices: 8
+  num_nodes: 100
+  accelerator: gpu
+  strategy: ddp
+  precision: 32
   gradient_clip_val: 1.0
-  log_every_n_steps: 10
-  val_check_interval: 1.0
-
-# Early stopping and checkpointing
+  log_every_n_steps: 25
+  val_check_interval: 25
+  max_steps: 20000
+  epochs: 10
+  warmup_steps: 2000
+  scheduler: cosine
+  cosine_max_steps: 20000
 callbacks:
   early_stopping:
-    monitor: 'val_loss'
+    monitor: val_loss
     patience: 10
-    mode: 'min'
+    mode: min
   model_checkpoint:
-    monitor: 'val_loss'
-    mode: 'min'
+    monitor: val_loss
+    mode: min
     save_top_k: 3
-    filename: 'epoch_{epoch:02d}-val_loss_{val_loss:.4f}'
-
-# Data configuration - ZARR OPTIMIZED
+    filename: best-val_loss_{val_loss:.4f}-step_{step}
+    save_last: true
 data:
-  data_path: "./data_processed/"       # Zarr consolidés
-  train_years: [2013, 2014, 2015, 2016]  # Années d'entraînement
-  val_years: [2017]                      # Validation sur 2017
-  test_years: [2018]                     # Test sur 2018
-  variables: ['u', 'v', 'temp', 'rh', 'psfc', 'pm10', 'so2', 'no2', 'co', 'o3', 'lat2d', 'lon2d', 'pm25']
-  target_variables: ['pm25', 'pm10', 'so2', 'no2', 'co', 'o3']
-  coordinate_variables: ['lat2d', 'lon2d']
+  data_path: ./data_processed/
+  grid_source: ./data_processed/data_2013_china_masked.zarr
+  train_years:
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  val_years:
+  - 2017
+  test_years:
+  - 2018
+  variables:
+  - u
+  - v
+  - temp
+  - rh
+  - psfc
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  - lat2d
+  - lon2d
+  - pm25
+  - elevation
+  - population
+  target_variables:
+  - pm25
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  coordinate_variables:
+  - lat2d
+  - lon2d
+  static_variables:
+  - elevation
+  - population
   time_step: 1
-  forecast_hours: [12, 24, 48, 96]
+  forecast_hours:
+  - 12
+  - 24
+  - 48
+  - 96
   normalize: true
-  target_resolution: [128, 256]  # Downsampled resolution
-  num_workers: 4                        # Adapté au DDP 4 GPUs
-  consolidated: true                    # Zarr optimisé
-  prefetch_factor: 2                    # Préchargement
-
-# Model configuration
+  target_resolution:
+  - 128
+  - 256
+  num_workers: 4
+  consolidated: true
+  prefetch_factor: 2
 model:
-  img_size: [128, 256]  # Downsampled resolution
+  img_size:
+  - 128
+  - 256
   patch_size: 2
   embed_dim: 768
   depth: 6
@@ -56,19 +104,15 @@ model:
   mlp_ratio: 4
   drop_path: 0.1
   drop_rate: 0.1
-  use_upsampling: true
-
-# System configuration
+  parallel_patch_embed: true
 system:
-  miopen_cache_dir: "/scratch/project_462000640/ammar/miopen_cache"
-
-# Lightning specific
+  miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:
   logger:
-    name: 'ALL_POLLUTANTS_ClimaX_Zarr_DDP4'
-    project: 'aq_net2'
+    name: OPTIMAL_16x32_WindScanning_20k_steps
+    project: aq_net2_steps_based
   trainer:
-    default_root_dir: './lightning_logs'
+    default_root_dir: ./lightning_logs
     enable_checkpointing: true
     enable_model_summary: true
     log_every_n_steps: 10

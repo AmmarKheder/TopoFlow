@@ -9,6 +9,30 @@ import gc
 from pathlib import Path
 from datetime import datetime, timedelta
 
+# ============================================
+# # # # #  NORM_STATS - Statistiques de normalisation
+# ============================================
+# Stats optimisées calculées sur l'ensemble du dataset
+# Utilisées pour normalisation rapide et cohérente
+NORM_STATS = {
+    "u": (0.0, 10.0), 
+    "v": (0.0, 10.0), 
+    "temp": (273.15, 30.0),
+    "rh": (50.0, 30.0), 
+    "psfc": (101325.0, 1000.0), 
+    "pm10": (50.0, 25.0),
+    "so2": (5.0, 5.0), 
+    "no2": (20.0, 15.0), 
+    "co": (200.0, 100.0),
+    "o3": (40.0, 20.0), 
+    "pm25": (25.0, 15.0), 
+    "lat2d": (32.0, 12.0), 
+    "lon2d": (106.0, 16.0),
+    "elevation": (1039.13, 1931.40),
+    "population": (13381.20, 67986.97)
+}
+
+
 class PM25AirQualityDataset(Dataset):
     """
     Dataset pour la prédiction de PM2.5 avec données d'observation météo et air quality
@@ -20,7 +44,7 @@ class PM25AirQualityDataset(Dataset):
                  variables: list,
                  target_variables: list = ['pm25'],
                  years: list = [2013, 2014],
-                 forecast_hours: list = [24],
+                 forecast_hours: list = [12, 24, 48, 96],
                  time_step: int = 1,
                  normalize: bool = True,
                  target_resolution: tuple = (128, 256)):
@@ -38,11 +62,11 @@ class PM25AirQualityDataset(Dataset):
         self.stats = {}
         
         # Charger et préparer les données
-        print(f"🔄 Initializing dataset for years {years}...")
+        print(f"# # # #  Initializing dataset for years {years}...")
         self._load_all_data()
         self._prepare_indices()
         
-        print(f"✅ Dataset ready: {len(self)} samples")
+        print(f"# # #  Dataset ready: {len(self)} samples")
 
     def _load_all_data(self):
         """Charger tous les fichiers zarr pour les années demandées"""
@@ -51,9 +75,9 @@ class PM25AirQualityDataset(Dataset):
         current_offset = 0
         
         for year in self.years:
-            zarr_path = self.data_path / f"data_{year}.zarr"
+            zarr_path = self.data_path / f"data_{year}_china_masked.zarr"
             if zarr_path.exists():
-                print(f"   📂 Loading {zarr_path}")
+                print(f"   # # # #  Loading {zarr_path}")
                 ds = xr.open_zarr(zarr_path, consolidated=True)
                 
                 # Préparer le downsampling et les grilles de coordonnées
@@ -64,9 +88,9 @@ class PM25AirQualityDataset(Dataset):
                 self.time_offsets.append(current_offset)
                 current_offset += len(ds.time)
                 
-                print(f"   ✅ Loaded {len(ds.time)} timesteps from {year}")
+                print(f"   # # #  Loaded {len(ds.time)} timesteps from {year}")
             else:
-                print(f"   ❌ Missing: {zarr_path}")
+                print(f"   # �#  Missing: {zarr_path}")
 
     def _prepare_downsampling(self, ds):
         """Préparer automatiquement le downsampling et les grilles de coordonnées"""
@@ -83,15 +107,15 @@ class PM25AirQualityDataset(Dataset):
         sample_data = ds[sample_var].isel(time=0)
         self.current_h, self.current_w = sample_data.shape
         
-        print(f"   📐 Original resolution: {self.current_h}×{self.current_w}")
-        print(f"   📐 Target resolution: {self.target_h}×{self.target_w}")
-        print(f"   🔄 Using bilinear interpolation for downsampling")
+        print(f"   # # # � Original resolution: {self.current_h}�# {self.current_w}")
+        print(f"   # # # � Target resolution: {self.target_h}�# {self.target_w}")
+        print(f"   # # # #  Using bilinear interpolation for downsampling")
         
-        # Créer les grilles de coordonnées à la résolution cible
+        # Créer les grilles de coordonnées �#  la résolution cible
         self._create_coordinate_grids(ds)
 
     def _create_coordinate_grids(self, ds):
-        """Créer les grilles de coordonnées automatiquement à la taille cible"""
+        """Créer les grilles de coordonnées automatiquement �#  la taille cible"""
         if 'lat2d' in ds.coords and 'lon2d' in ds.coords:
             # Extraire les coordonnées 1D originales
             lat_1d_orig = ds.coords['lat2d'].values  # (current_h,)
@@ -104,17 +128,17 @@ class PM25AirQualityDataset(Dataset):
             lat_1d = np.interp(lat_indices, np.arange(len(lat_1d_orig)), lat_1d_orig)
             lon_1d = np.interp(lon_indices, np.arange(len(lon_1d_orig)), lon_1d_orig)
             
-            # Créer les grilles 2D à la résolution cible
+            # Créer les grilles 2D �#  la résolution cible
             lon_grid, lat_grid = np.meshgrid(lon_1d, lat_1d)  # (target_h, target_w)
             
             self.lat_grid = lat_grid.astype(np.float32)
             self.lon_grid = lon_grid.astype(np.float32)
             
-            print(f"   🌍 Coordinate grids created: lat=({self.lat_grid.shape}), lon=({self.lon_grid.shape})")
+            print(f"   # # # � Coordinate grids created: lat=({self.lat_grid.shape}), lon=({self.lon_grid.shape})")
         else:
             self.lat_grid = None
             self.lon_grid = None
-            print("   ⚠️  No coordinate grids (lat2d/lon2d not found)")
+            print("   # # # # # #   No coordinate grids (lat2d/lon2d not found)")
 
     def _prepare_indices(self):
         """Préparer les indices des échantillons valides"""
@@ -128,15 +152,20 @@ class PM25AirQualityDataset(Dataset):
                 for forecast_h in self.forecast_hours:
                     self.valid_indices.append((ds_idx, t, forecast_h))
         
-        print(f"   📊 Prepared {len(self.valid_indices)} valid samples")
+        print(f"   # # # #  Prepared {len(self.valid_indices)} valid samples")
 
     def _normalize(self, data, var_name):
-        """Normalisation Z-score simplifiée"""
+        """Normalisation avec NORM_STATS priorisées (optimisé)"""
         if not self.normalize:
             return data
         
+        # # # # #  Utiliser stats hardcodées si disponibles (plus rapide)
+        if var_name in NORM_STATS:
+            mean, std = NORM_STATS[var_name]
+            return (data - mean) / (std + 1e-8)
+        
+        # # # # #  Fallback: calcul dynamique (pour variables non-standard)
         if var_name not in self.stats:
-            # Calculer stats à la volée (pour éviter le stockage)
             finite_data = data[np.isfinite(data)]
             if len(finite_data) > 0:
                 self.stats[var_name] = {
@@ -177,23 +206,27 @@ class PM25AirQualityDataset(Dataset):
         for var in self.variables:
             if var in ds.data_vars:
                 # Variable météo: charger et downsampler
-                var_data = ds[var].isel(time=t).values  # [H, W]
+                # Vérifier si la variable a une dimension temporelle
+                if "time" in ds[var].dims:
+                    var_data = ds[var].isel(time=t).values  # [H, W] - Variable temporelle
+                else:
+                    var_data = ds[var].values  # [H, W] - Variable statique (elevation, etc.)
                 var_data = self._normalize(var_data, var)
                 var_data = self._downsample_tensor(var_data)  # [target_h, target_w]
                 input_vars.append(var_data.numpy())
                 
             elif var == 'lat2d' and self.lat_grid is not None:
-                # Grille latitude (déjà à la bonne taille)
+                # Grille latitude (déj�#  �#  la bonne taille)
                 input_vars.append(self.lat_grid)
                 
             elif var == 'lon2d' and self.lon_grid is not None:
-                # Grille longitude (déjà à la bonne taille)
+                # Grille longitude (déj�#  �#  la bonne taille)
                 input_vars.append(self.lon_grid)
         
         # Stack des variables: [n_vars, target_h, target_w]
         input_data = np.stack(input_vars, axis=0)
         
-        # Variables cibles avec même downsampling - SUPPORT MULTI-POLLUANTS
+        # Variables cibles avec m�# me downsampling - SUPPORT MULTI-POLLUANTS
         target_t = t + forecast_hours
         target_data_list = []
         for target_var in self.target_variables:

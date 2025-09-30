@@ -93,3 +93,18 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# TopoFlow specific
+archive/
+data_processed/
+data_processed_npy/
+visualizations/
+*.zarr/
+venv_pytorch_rocm/
+*.backup
+*.backup_*
+*.backup2
+*.bak
+configs/*.backup*
+src/*.backup*
+scripts/*.backup*

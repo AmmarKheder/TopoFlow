@@ -16,20 +16,20 @@ class AQNetDataModule(pl.LightningDataModule):
         self.data_config = config['data']
         self.train_config = config['train']
         
-        # Paramètres du dataset depuis la config
+        # Param�# tres du dataset depuis la config
         self.data_path = self.data_config['data_path']
         self.variables = self.data_config['variables']
         self.target_variables = self.data_config.get('target_variables', ['pm25'])
         
-        # IMPORTANT: L'ancien code utilisait forecast_days DIRECTEMENT comme forecast_hours
+        # IMPORTANT: L'ancien code utilisait forecast_hours DIRECTEMENT comme forecast_hours
         # C'était un bug mais c'est ce qui fonctionnait !
-        # Il passait [1, 3, 5, 7] au lieu de [24, 72, 120, 168]
-        self.forecast_hours = self.data_config.get('forecast_days', [1, 3, 5, 7])
+        # Il passait [12, 24, 48, 96] au lieu de [12, 24, 48, 96]
+        self.forecast_hours = self.data_config.get('forecast_hours', [12, 24, 48, 96])
         
         self.normalize = self.data_config.get('normalize', True)
         self.target_resolution = tuple(self.data_config.get('target_resolution', [128, 256]))
         
-        # Paramètres d'entraînement
+        # Param�# tres d'entraînement
         self.batch_size = self.train_config['batch_size']
         self.val_batch_size = self.train_config.get('val_batch_size', self.batch_size)
         self.num_workers = self.data_config.get('num_workers', 8)
@@ -49,7 +49,7 @@ class AQNetDataModule(pl.LightningDataModule):
                 variables=self.variables,
                 target_variables=self.target_variables,
                 years=self.train_years,
-                forecast_hours=self.forecast_hours,  # Passe [1, 3, 5, 7] comme l'ancien
+                forecast_hours=self.forecast_hours,  # Passe [12, 24, 48, 96] comme l'ancien
                 normalize=self.normalize,
                 target_resolution=self.target_resolution
             )
@@ -60,7 +60,7 @@ class AQNetDataModule(pl.LightningDataModule):
                 variables=self.variables,
                 target_variables=self.target_variables,
                 years=self.val_years,
-                forecast_hours=self.forecast_hours,  # Passe [1, 3, 5, 7] comme l'ancien
+                forecast_hours=self.forecast_hours,  # Passe [12, 24, 48, 96] comme l'ancien
                 normalize=self.normalize,
                 target_resolution=self.target_resolution
             )
@@ -79,7 +79,7 @@ class AQNetDataModule(pl.LightningDataModule):
                 variables=self.variables,
                 target_variables=self.target_variables,
                 years=self.test_years,
-                forecast_hours=self.forecast_hours,  # Passe [1, 3, 5, 7] comme l'ancien
+                forecast_hours=self.forecast_hours,  # Passe [12, 24, 48, 96] comme l'ancien
                 normalize=self.normalize,
                 target_resolution=self.target_resolution
             )

@@ -13,8 +13,9 @@ from src.climax_core.utils.pos_embed import (
     get_2d_sincos_pos_embed,
 )
 
-from src.climax_core.parallelpatchembed import ParallelVarPatchEmbed
+from src.climax_core.parallelpatchembed_wind import ParallelVarPatchEmbedWind as ParallelVarPatchEmbed
 
+from src.climax_core.physics_attention_patch_level import PhysicsGuidedBlockPatchLevel as PhysicsGuidedBlock, ElevationPatchProcessor
 
 class ClimaX(nn.Module):
     """Implements the ClimaX model as described in the paper,
@@ -47,6 +48,7 @@ class ClimaX(nn.Module):
         drop_path=0.1,
         drop_rate=0.1,
         parallel_patch_embed=False,
+        scan_order="hilbert",
     ):
         super().__init__()
 
@@ -56,12 +58,15 @@ class ClimaX(nn.Module):
         self.default_vars = default_vars
         self.parallel_patch_embed = parallel_patch_embed
         # variable tokenization: separate embedding layer for each input variable
+        self.scan_order = scan_order
         if self.parallel_patch_embed:
             self.token_embeds = ParallelVarPatchEmbed(len(default_vars), img_size, patch_size, embed_dim)
             self.num_patches = self.token_embeds.num_patches
         else:
+            # Use all_vars length for token embeds to match variable mapping
+            all_vars = ['u', 'v', 'temp', 'rh', 'psfc', 'pm10', 'so2', 'no2', 'co', 'o3', 'lat2d', 'lon2d', 'pm25', 'elevation', 'population']
             self.token_embeds = nn.ModuleList(
-                [PatchEmbed(img_size, patch_size, 1, embed_dim) for i in range(len(default_vars))]
+                [PatchEmbed(img_size, patch_size, 1, embed_dim) for i in range(len(all_vars))]
             )
             self.num_patches = self.token_embeds[0].num_patches
 
@@ -82,57 +87,29 @@ class ClimaX(nn.Module):
         # ViT backbone
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path, depth)]  # stochastic depth decay rule
-        self.blocks = nn.ModuleList(
-            [
-                Block(
+        # Create blocks with physics-informed first block
+        blocks = []
+        for i in range(depth):
+            if i == 0:
+                # First block: Physics-informed attention
+                blocks.append(PhysicsGuidedBlock(
                     embed_dim,
                     num_heads,
                     mlp_ratio,
                     qkv_bias=True,
                     drop_path=dpr[i],
                     norm_layer=nn.LayerNorm,
-                )
-                for i in range(depth)
-            ]
-        )
+                ))
+            else:
+                # Standard blocks
+                blocks.append(Block(
+        self.blocks = nn.ModuleList(blocks)
+        
+        # Layer normalization after transformer blocks
         self.norm = nn.LayerNorm(embed_dim)
-
-        # --------------------------------------------------------------------------
-
-        # prediction head
-        self.head = nn.ModuleList()
-        for _ in range(decoder_depth):
-            self.head.append(nn.Linear(embed_dim, embed_dim))
-            self.head.append(nn.GELU())
-        self.head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2))
-        self.head = nn.Sequential(*self.head)
-
-        # --------------------------------------------------------------------------
-
-        self.initialize_weights()
-
-    def initialize_weights(self):
-        # initialize pos_emb and var_emb
-        pos_embed = get_2d_sincos_pos_embed(
-            self.pos_embed.shape[-1],
-            int(self.img_size[0] / self.patch_size),
-            int(self.img_size[1] / self.patch_size),
-            cls_token=False,
-        )
-        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
-
-        var_embed = get_1d_sincos_pos_embed_from_grid(self.var_embed.shape[-1], np.arange(len(self.default_vars)))
-        self.var_embed.data.copy_(torch.from_numpy(var_embed).float().unsqueeze(0))
-
-        # token embedding layer
-        if self.parallel_patch_embed:
-            for i in range(len(self.token_embeds.proj_weights)):
-                w = self.token_embeds.proj_weights[i].data
-                trunc_normal_(w.view([w.shape[0], -1]), std=0.02)
-        else:
-            for i in range(len(self.token_embeds)):
-                w = self.token_embeds[i].proj.weight.data
-                trunc_normal_(w.view([w.shape[0], -1]), std=0.02)
+        
+        # Decoder head
+        self.head = nn.Linear(embed_dim, len(self.default_vars) * patch_size * patch_size)
 
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
@@ -147,13 +124,12 @@ class ClimaX(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def create_var_embedding(self, dim):
-        var_embed = nn.Parameter(torch.zeros(1, len(self.default_vars), dim), requires_grad=True)
-        # TODO: create a mapping from var --> idx
+        # Use all variables for token embeddings to match the mapping
+        all_vars = ['u', 'v', 'temp', 'rh', 'psfc', 'pm10', 'so2', 'no2', 'co', 'o3', 'lat2d', 'lon2d', 'pm25', 'elevation', 'population']
+        var_embed = nn.Parameter(torch.zeros(1, len(all_vars), dim), requires_grad=True)
         var_map = {}
-        idx = 0
-        for var in self.default_vars:
+        for idx, var in enumerate(all_vars):
             var_map[var] = idx
-            idx += 1
         return var_embed, var_map
 
     
@@ -172,7 +148,6 @@ class ClimaX(nn.Module):
         """
         x: (B, L, V * patch_size**2)
         return imgs: (B, V, H, W)
-        """
         p = self.patch_size
         c = len(self.default_vars)
         h = self.img_size[0] // p if h is None else h // p
@@ -185,9 +160,7 @@ class ClimaX(nn.Module):
         return imgs
 
     def aggregate_variables(self, x: torch.Tensor):
-        """
         x: B, V, L, D
-        """
         b, _, l, _ = x.shape
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
@@ -201,6 +174,10 @@ class ClimaX(nn.Module):
 
     def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
         # x: `[B, V, H, W]` shape.
+        # Save input for physics bias computation
+        x_input = x.clone()  # [B, V, H, W] - raw meteorological data
+
+
 
         if isinstance(variables, list):
             variables = tuple(variables)
@@ -209,9 +186,7 @@ class ClimaX(nn.Module):
         embeds = []
         var_ids = self.get_var_ids(variables, x.device)
 
-        if self.parallel_patch_embed:
             x = self.token_embeds(x, var_ids)  # B, V, L, D
-        else:
             for i in range(len(var_ids)):
                 id = var_ids[i]
                 embeds.append(self.token_embeds[id](x[:, i : i + 1]))
@@ -235,11 +210,14 @@ class ClimaX(nn.Module):
         x = self.pos_drop(x)
 
         # apply Transformer blocks
-        for blk in self.blocks:
-            x = blk(x)
+        # apply Transformer blocks with physics bias for first block
+        for i, blk in enumerate(self.blocks):
+                # First block: compute and apply physics bias
+                elevation_patches = self._compute_elevation_patches(x_input, variables)
+                x = blk(x, elevation_patches)
+                x = blk(x)
         x = self.norm(x)
 
-        return x
 
     def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
         """Forward pass through the model.
@@ -252,7 +230,6 @@ class ClimaX(nn.Module):
         Returns:
             loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
-        """
         out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
         preds = self.head(out_transformers)  # B, L, V*p*p
 
@@ -262,11 +239,37 @@ class ClimaX(nn.Module):
 
         if metric is None:
             loss = None
-        else:
             loss = [m(preds, y, out_variables, lat) for m in metric]
 
         return loss, preds
 
+
+    def _compute_elevation_patches(self, x_input: torch.Tensor, variables: tuple) -> torch.Tensor:
+        Compute elevation per patch for patch-level physics attention.
+        Higher granularity: each 2x2 patch has its own elevation.
+        
+            x_input: [B, V, H, W] raw meteorological data
+            variables: tuple of variable names
+        
+            elevation_patches: [B, N] normalized elevation per patch where N=num_patches
+        # Find elevation index
+        try:
+            elev_idx = variables.index("elevation")
+        except ValueError:
+            # No elevation data, return neutral patches
+            B = x_input.shape[0]
+            num_patches = (x_input.shape[2] // self.patch_size) * (x_input.shape[3] // self.patch_size)
+            return torch.ones(B, num_patches, device=x_input.device) * 0.5
+        
+        # Extract elevation field
+        elevation_field = x_input[:, elev_idx]  # [B, H, W]
+        
+        # Compute patch-level elevations
+        elevation_patches = ElevationPatchProcessor.compute_patch_elevations(
+            elevation_field, self.patch_size
+        )
+        
+        return elevation_patches
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]

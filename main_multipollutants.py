@@ -1,37 +1,55 @@
 import os
 import sys
 import argparse
+import subprocess
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from src.config_manager import ConfigManager
 from src.datamodule_fixed import AQNetDataModule
-from src.model_multipollutants import MultiPollutantLightningModule
+from src.model_multipollutants import MultiPollutantLightningModule as PM25LightningModule
 
 
 def main(config_path):
-    print("🚀 DÉMARRAGE AQ_NET2 - PRÉDICTION MULTI-POLLUANTS")
+    # # # # #  FIX DEVICE MISMATCH - CRITICAL FOR DDP (LUMI/SLURM compatible)
+    if "LOCAL_RANK" in os.environ:
+        local_rank = int(os.environ["LOCAL_RANK"])
+    elif "SLURM_LOCALID" in os.environ:  # fallback SLURM
+        local_rank = int(os.environ["SLURM_LOCALID"])
+    else:
+        local_rank = 0  # default (single-GPU run)
+
+    torch.cuda.set_device(local_rank)
+    print(f"# # # #  Bound process to cuda:{local_rank} "
+          f"(LOCAL_RANK={os.environ.get('LOCAL_RANK')}, "
+          f"SLURM_LOCALID={os.environ.get('SLURM_LOCALID')})")
+    
+    print("# # # #  D�# MARRAGE AQ_NET2 - PR�# DICTION MULTI-POLLUANTS")
     
     # Initial setup
     cfg_mgr = ConfigManager(config_path)
     config = cfg_mgr.config
     
-    print(f"📋 Configuration: {config_path}")
-    print(f"📊 Résolution: {config['model']['img_size']}")
-    print(f"🔧 Variables: {len(config['data']['variables'])}")
-    print(f"🎯 Cibles: {config['data']['target_variables']} ({len(config['data']['target_variables'])} polluants)")
-    print("🇨🇳 MASQUE CHINE ACTIVÉ dans la loss function")
+    print(f"# # # #  Configuration: {config_path}")
+    print(f"# # # #  Résolution: {config['model']['img_size']}")
+    print(f"# # # #  Variables: {len(config['data']['variables'])}")
+    print(f"# # # #  Cibles: {config['data']['target_variables']} ({len(config['data']['target_variables'])} polluants)")
+    print("# # # # # # # #  MASQUE CHINE ACTIV�#  dans la loss function")
     
     # Initialize Data Module
-    print("📁 Initialisation du DataModule...")
+    print("# # # #  Initialisation du DataModule...")
     data_module = AQNetDataModule(config)
     
-    # Initialize Model from scratch (no checkpoint for multi-pollutant yet)
-    print("🧠 Initialisation du modèle multi-polluants...")
-    model = MultiPollutantLightningModule(config)
-    print("✅ Modèle multi-polluants initialisé")
+    # TRANSFER LEARNING: Initialize Model from EO checkpoint
+    print("# # # #  Initialisation du mod�# le multi-polluants...")
+    # Load EO checkpoint for transfer learning
+    checkpoint_path = "logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt"
+    print(f"# # # #  Loading EO checkpoint: {checkpoint_path}")
+    model = PM25LightningModule.load_from_checkpoint(checkpoint_path, config=config, strict=False)
+    print("# # #  Mod�# le multi-polluants initialisé")
     
     # Loggers (TensorBoard + CSV)
-    print("📈 Configuration des loggers (TensorBoard + CSV)...")
+    print("# # # #  Configuration des loggers (TensorBoard + CSV)...")
     
     # TensorBoard Logger
     tb_logger = pl_loggers.TensorBoardLogger(
@@ -63,7 +81,7 @@ def main(config_path):
     
     # Trainer
     trainer = pl.Trainer(
-        num_nodes=4,
+        num_nodes=config["train"]["num_nodes"],
         devices=config['train']['devices'],
         accelerator=config['train']['accelerator'],
         strategy=config['train']['strategy'],
@@ -77,22 +95,75 @@ def main(config_path):
         val_check_interval=config['train']['val_check_interval'],
         default_root_dir=config['lightning']['trainer']['default_root_dir'],
         enable_checkpointing=config['lightning']['trainer']['enable_checkpointing'],
-        enable_model_summary=config['lightning']['trainer']['enable_model_summary']
+        enable_model_summary=config['lightning']['trainer']['enable_model_summary'],
+        num_sanity_val_steps=1  # # # # #  TEST: 1 seul step pour debug device mismatch
     )
     
     print("\n" + "="*60)
-    print("🏃‍♂️ DÉMARRAGE DE L'ENTRAÎNEMENT MULTI-POLLUANTS")
+    print("# # # �# # �# # # # # #  D�# MARRAGE DE L'ENTRA�# NEMENT MULTI-POLLUANTS")
     print("="*60)
-    print(f"🎯 Polluants: {', '.join(config['data']['target_variables'])}")
-    print(f"🚀 Horizons: {config['data']['forecast_hours']} heures")
-    print(f"⚡ GPUs: {config['train']['devices']}")
-    print(f"📦 Batch size: {config['train']['batch_size']} par GPU")
+    print(f"# # # #  Polluants: {', '.join(config['data']['target_variables'])}")
+    print(f"# # # #  Horizons: {config['data']['forecast_hours']} heures")
+    print(f"# # � GPUs: {config['train']['devices']}")
+    print(f"# # # #  Batch size: {config['train']['batch_size']} par GPU")
+    print("# # # #  SANITY CHECK: 1 step seulement (debug device mismatch)")
     print("="*60 + "\n")
     
     # Start training
     trainer.fit(model, data_module)
     
-    print("\n🎉 ENTRAÎNEMENT TERMINÉ!")
+    print("\n# # # #  ENTRA�# NEMENT TERMIN�# !")
+    
+    # ============================================
+    # # # # #  LANCEMENT AUTOMATIQUE DES TESTS
+    # ============================================
+    print("\n" + "="*60)
+    print("# # # #  LANCEMENT AUTOMATIQUE DU TEST (2018)")
+    print("="*60)
+    print("# # # #  Recherche du meilleur checkpoint...")
+    print("# # # #  �# valuation sur l'année test 2018...")
+    print("="*60 + "\n")
+    
+    try:
+        # Déterminer le répertoire de logs
+        log_dir = "logs/multipollutants_climax_ddp"
+        
+        # Lancer le test automatiquement
+        test_cmd = [
+            "python", "scripts/auto_test_after_training.py",
+            "--config", config_path,
+            "--log_dir", log_dir,
+            "--gpus", str(config['train']['devices']) if isinstance(config['train']['devices'], int) else "1"
+        ]
+        
+        print(f"# # # #  Commande de test: {' '.join(test_cmd)}")
+        
+        # Exécuter le test
+        result = subprocess.run(
+            test_cmd,
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        
+        if result.returncode == 0:
+            print("# # #  �# VALUATION TEST R�# USSIE!")
+            print("# # # #  Résultats du test:")
+            print(result.stdout)
+        else:
+            print("# # # # # #  ERREUR LORS DU TEST:")
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+            print(f"Code de retour: {result.returncode}")
+            
+    except Exception as e:
+        print(f"# �#  ERREUR lors du lancement automatique du test: {str(e)}")
+        print("# # # #  Vous pouvez lancer le test manuellement avec:")
+        print(f"python scripts/auto_test_after_training.py --config {config_path} --log_dir logs/multipollutants_climax_ddp")
+    
+    print("\n" + "="*60)
+    print("# # # #  PIPELINE COMPLET TERMIN�#  (ENTRA�# NEMENT + TEST)")
+    print("="*60)
 
 
 if __name__ == "__main__":

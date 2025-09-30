@@ -18,7 +18,7 @@ export TIMM_FUSED_ATTN=0
 
 # ROCm/HIP configuration for LUMI
 export ROCM_PATH=/opt/rocm
-export HIP_VISIBLE_DEVICES=0,1,2,3
+export HIP_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export PYTORCH_HIP_ALLOC_CONF=expandable_segments:False
 export HSA_FORCE_FINE_GRAIN_PCIE=1
 
@@ -56,5 +56,5 @@ echo "DEBUG: WORLD_SIZE=${WORLD_SIZE}"
 # Launch multi-pollutant training with PyTorch Lightning
 echo "📋 Starting Multi-Pollutant PyTorch Lightning training..."
 echo "🎯 Target pollutants: PM2.5, PM10, SO2, NO2, CO, O3"
-echo "🚀 Forecast horizons: 1, 3, 5, 7 days"
+echo "🚀 Forecast horizons: 12, 24, 48, 96 hours"
 python main_multipollutants_resume_from_ckpt.py --config ${1:-configs/config_all_pollutants.yaml}
