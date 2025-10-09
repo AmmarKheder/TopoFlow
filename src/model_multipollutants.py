@@ -50,6 +50,8 @@ class MultiPollutantModel(nn.Module):
             mlp_ratio=config["model"]["mlp_ratio"],
             scan_order=config.get("model", {}).get("scan_order", "hilbert"),
             parallel_patch_embed=config.get("model", {}).get("parallel_patch_embed", False),
+            use_physics_mask=config.get("model", {}).get("use_physics_mask", False),
+            use_3d_learnable=config.get("model", {}).get("use_3d_learnable", False),
         )
 
         # Indices des variables cibles

@@ -14,8 +14,8 @@ from src.climax_core.utils.pos_embed import (
 )
 
 from src.climax_core.parallelpatchembed_wind import ParallelVarPatchEmbedWind as ParallelVarPatchEmbed
-
-from src.climax_core.physics_attention_patch_level import PhysicsGuidedBlockPatchLevel as PhysicsGuidedBlock, ElevationPatchProcessor
+from src.climax_core.topoflow_attention import TopoFlowBlock, compute_patch_elevations
+from src.climax_core.relative_position_bias_3d import Attention3D, compute_patch_coords_3d
 
 class ClimaX(nn.Module):
     """Implements the ClimaX model as described in the paper,
@@ -49,6 +49,8 @@ class ClimaX(nn.Module):
         drop_rate=0.1,
         parallel_patch_embed=False,
         scan_order="hilbert",
+        use_physics_mask=False,
+        use_3d_learnable=False,
     ):
         super().__init__()
 
@@ -57,6 +59,8 @@ class ClimaX(nn.Module):
         self.patch_size = patch_size
         self.default_vars = default_vars
         self.parallel_patch_embed = parallel_patch_embed
+        self.use_physics_mask = use_physics_mask
+        self.use_3d_learnable = use_3d_learnable
         # variable tokenization: separate embedding layer for each input variable
         self.scan_order = scan_order
         if self.parallel_patch_embed:
@@ -87,30 +91,60 @@ class ClimaX(nn.Module):
         # ViT backbone
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path, depth)]  # stochastic depth decay rule
-        # Create blocks with physics-informed first block
-        blocks = []
-        for i in range(depth):
-            if i == 0:
-                # First block: Physics-informed attention
-                blocks.append(PhysicsGuidedBlock(
+
+        # Standard ViT blocks
+        self.blocks = nn.ModuleList([
+            Block(
+                embed_dim,
+                num_heads,
+                mlp_ratio,
+                qkv_bias=True,
+                drop_path=dpr[i],
+                norm_layer=nn.LayerNorm,
+            )
+            for i in range(depth)
+        ])
+
+        # TopoFlow: Physics-guided attention (optional)
+        if self.use_physics_mask:
+            grid_h = img_size[0] // patch_size
+            grid_w = img_size[1] // patch_size
+
+            if self.use_3d_learnable:
+                # Option: 3D Learnable MLP (Zhi-Song's approach)
+                # Replace attention in first block with Attention3D
+                self.blocks[0] = Block(
                     embed_dim,
                     num_heads,
                     mlp_ratio,
                     qkv_bias=True,
-                    drop_path=dpr[i],
+                    drop_path=dpr[0],
                     norm_layer=nn.LayerNorm,
-                ))
+                )
+                # Replace attention module with 3D version
+                self.blocks[0].attn = Attention3D(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    qkv_bias=True,
+                    attn_drop=0.,
+                    proj_drop=0.,
+                    use_3d_bias=True,
+                    rel_pos_hidden_dim=64
+                )
+                print(f"✅ 3D Learnable Bias enabled: block 0, grid {grid_h}×{grid_w}, MLP-based")
             else:
-                # Standard blocks
-                blocks.append(Block(
-                    embed_dim,
-                    num_heads,
-                    mlp_ratio,
+                # Option: Simple physics formula (TopoFlow)
+                self.blocks[0] = TopoFlowBlock(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
                     qkv_bias=True,
-                    drop_path=dpr[i],
+                    drop_path=dpr[0],
                     norm_layer=nn.LayerNorm,
-                ))
-        self.blocks = nn.ModuleList(blocks)
+                    use_elevation_bias=True,
+                    use_wind_modulation=True
+                )
+                print(f"✅ TopoFlow enabled: block 0, grid {grid_h}×{grid_w}, elevation+wind")
         
         # Layer normalization after transformer blocks
         self.norm = nn.LayerNorm(embed_dim)
@@ -182,12 +216,8 @@ class ClimaX(nn.Module):
         x = x.unflatten(dim=0, sizes=(b, l))  # B, L, D
         return x
 
-    def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
+    def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables, x_raw=None):
         # x: `[B, V, H, W]` shape.
-        # Save input for physics bias computation
-        x_input = x.clone()  # [B, V, H, W] - raw meteorological data
-
-
 
         if isinstance(variables, list):
             variables = tuple(variables)
@@ -197,41 +227,87 @@ class ClimaX(nn.Module):
         var_ids = self.get_var_ids(variables, x.device)
 
         if self.parallel_patch_embed:
-            x = self.token_embeds(x, var_ids)  # B, V, L, D
+            x_tokens = self.token_embeds(x, var_ids)  # B, V, L, D
         else:
             for i in range(len(var_ids)):
                 id = var_ids[i]
                 embeds.append(self.token_embeds[id](x[:, i : i + 1]))
-            x = torch.stack(embeds, dim=1)  # B, V, L, D
+            x_tokens = torch.stack(embeds, dim=1)  # B, V, L, D
 
         # add variable embedding
         var_embed = self.get_var_emb(self.var_embed, variables)
-        x = x + var_embed.unsqueeze(2)  # B, V, L, D
+        x_tokens = x_tokens + var_embed.unsqueeze(2)  # B, V, L, D
 
         # variable aggregation
-        x = self.aggregate_variables(x)  # B, L, D
+        x_tokens = self.aggregate_variables(x_tokens)  # B, L, D
 
         # add pos embedding
-        x = x + self.pos_embed
+        x_tokens = x_tokens + self.pos_embed
 
         # add lead time embedding
         lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
         lead_time_emb = lead_time_emb.unsqueeze(1)
-        x = x + lead_time_emb  # B, L, D
+        x_tokens = x_tokens + lead_time_emb  # B, L, D
 
-        x = self.pos_drop(x)
+        x_tokens = self.pos_drop(x_tokens)
 
-        # apply Transformer blocks with physics bias for first block
+        # Extract elevation and wind for physics-guided attention
+        elevation_patches = None
+        u_wind = None
+        v_wind = None
+        coords_3d = None
+
+        if self.use_physics_mask and x_raw is not None:
+            try:
+                var_list = list(variables)
+                if 'elevation' in var_list and 'u' in var_list and 'v' in var_list:
+                    elev_idx = var_list.index('elevation')
+                    u_idx = var_list.index('u')
+                    v_idx = var_list.index('v')
+
+                    elevation_field = x_raw[:, elev_idx, :, :]  # [B, H, W]
+                    u_wind = x_raw[:, u_idx, :, :]  # [B, H, W]
+                    v_wind = x_raw[:, v_idx, :, :]  # [B, H, W]
+
+                    if self.use_3d_learnable:
+                        # Compute 3D coordinates (x, y, elevation) for 3D MLP
+                        coords_3d = compute_patch_coords_3d(
+                            elevation_field,
+                            img_size=tuple(self.img_size),
+                            patch_size=self.patch_size
+                        )  # [B, N, 3]
+                    else:
+                        # Compute patch-level elevations for simple formula
+                        elevation_patches = compute_patch_elevations(
+                            elevation_field,
+                            patch_size=self.patch_size
+                        )  # [B, N]
+            except Exception as e:
+                print(f"⚠️ Physics data extraction failed: {e}")
+                elevation_patches = None
+                u_wind = None
+                v_wind = None
+                coords_3d = None
+
+        # Apply Transformer blocks
         for i, blk in enumerate(self.blocks):
-            if i == 0:
-                # First block: compute and apply physics bias
-                elevation_patches = self._compute_elevation_patches(x_input, variables)
-                x = blk(x, elevation_patches)
+            if i == 0 and self.use_physics_mask:
+                if self.use_3d_learnable and coords_3d is not None:
+                    # 3D MLP approach: pass 3D coordinates to attention
+                    x_tokens = blk.attn(blk.norm1(x_tokens), coords_3d=coords_3d)
+                    x_tokens = x_tokens + blk.drop_path1(x_tokens)
+                    x_tokens = x_tokens + blk.drop_path2(blk.mlp(blk.norm2(x_tokens)))
+                elif isinstance(blk, TopoFlowBlock):
+                    # Simple formula approach
+                    x_tokens = blk(x_tokens, elevation_patches, u_wind, v_wind)
+                else:
+                    x_tokens = blk(x_tokens)
             else:
-                x = blk(x)
-        x = self.norm(x)
+                # Standard blocks
+                x_tokens = blk(x_tokens)
+        x_tokens = self.norm(x_tokens)
 
-        return x
+        return x_tokens
 
     def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
         """Forward pass through the model.
@@ -245,7 +321,9 @@ class ClimaX(nn.Module):
             loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
         """
-        out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
+        # Pass x_raw for physics mask computation
+        x_raw = x if self.use_physics_mask else None
+        out_transformers = self.forward_encoder(x, lead_times, variables, x_raw=x_raw)  # B, L, D
         preds = self.head(out_transformers)  # B, L, V*p*p
 
         preds = self.unpatchify(preds)
@@ -258,35 +336,6 @@ class ClimaX(nn.Module):
 
         return loss, preds
 
-
-    def _compute_elevation_patches(self, x_input: torch.Tensor, variables: tuple) -> torch.Tensor:
-        """
-        Compute elevation per patch for patch-level physics attention.
-        Higher granularity: each 2x2 patch has its own elevation.
-
-            x_input: [B, V, H, W] raw meteorological data
-            variables: tuple of variable names
-
-            elevation_patches: [B, N] normalized elevation per patch where N=num_patches
-        """
-        # Find elevation index
-        try:
-            elev_idx = variables.index("elevation")
-        except ValueError:
-            # No elevation data, return neutral patches
-            B = x_input.shape[0]
-            num_patches = (x_input.shape[2] // self.patch_size) * (x_input.shape[3] // self.patch_size)
-            return torch.ones(B, num_patches, device=x_input.device) * 0.5
-        
-        # Extract elevation field
-        elevation_field = x_input[:, elev_idx]  # [B, H, W]
-        
-        # Compute patch-level elevations
-        elevation_patches = ElevationPatchProcessor.compute_patch_elevations(
-            elevation_field, self.patch_size
-        )
-        
-        return elevation_patches
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
-        _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
+        _,preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]
