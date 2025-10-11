@@ -16,7 +16,7 @@ class AQNetDataModule(pl.LightningDataModule):
         self.data_config = config['data']
         self.train_config = config['train']
         
-        # ParamÃ# tres du dataset depuis la config
+        # Paramï¿½# tres du dataset depuis la config
         self.data_path = self.data_config['data_path']
         self.variables = self.data_config['variables']
         self.target_variables = self.data_config.get('target_variables', ['pm25'])
@@ -29,7 +29,7 @@ class AQNetDataModule(pl.LightningDataModule):
         self.normalize = self.data_config.get('normalize', True)
         self.target_resolution = tuple(self.data_config.get('target_resolution', [128, 256]))
         
-        # ParamÃ# tres d'entraÃ®nement
+        # Paramï¿½# tres d'entraÃ®nement
         self.batch_size = self.train_config['batch_size']
         self.val_batch_size = self.train_config.get('val_batch_size', self.batch_size)
         self.num_workers = self.data_config.get('num_workers', 8)
@@ -92,31 +92,33 @@ class AQNetDataModule(pl.LightningDataModule):
     
     def train_dataloader(self):
         """Retourne le DataLoader d'entraÃ®nement"""
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=self.num_workers,
-            multiprocessing_context="spawn",
-            pin_memory=True,
-            persistent_workers=False,
-            drop_last=True,
-            prefetch_factor=self.data_config.get('prefetch_factor', 2)
-        )
+        loader_kwargs = {
+            'batch_size': self.batch_size,
+            'shuffle': True,
+            'num_workers': self.num_workers,
+            'pin_memory': self.data_config.get('pin_memory', True),
+            'persistent_workers': self.data_config.get('persistent_workers', True) if self.num_workers > 0 else False,
+            'drop_last': True,
+        }
+        if self.num_workers > 0:
+            loader_kwargs['multiprocessing_context'] = "spawn"
+            loader_kwargs['prefetch_factor'] = self.data_config.get('prefetch_factor', 2)
+        return DataLoader(self.train_dataset, **loader_kwargs)
     
     def val_dataloader(self):
         """Retourne le DataLoader de validation"""
-        return DataLoader(
-            self.val_dataset,
-            batch_size=self.val_batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            multiprocessing_context="spawn",
-            pin_memory=True,
-            persistent_workers=False,
-            drop_last=False,
-            prefetch_factor=self.data_config.get('prefetch_factor', 2)
-        )
+        loader_kwargs = {
+            'batch_size': self.val_batch_size,
+            'shuffle': False,
+            'num_workers': self.num_workers,
+            'pin_memory': self.data_config.get('pin_memory', True),
+            'persistent_workers': self.data_config.get('persistent_workers', True) if self.num_workers > 0 else False,
+            'drop_last': False,
+        }
+        if self.num_workers > 0:
+            loader_kwargs['multiprocessing_context'] = "spawn"
+            loader_kwargs['prefetch_factor'] = self.data_config.get('prefetch_factor', 2)
+        return DataLoader(self.val_dataset, **loader_kwargs)
     
     def test_dataloader(self):
         """Retourne le DataLoader de test"""

@@ -91,8 +91,14 @@ class ParallelVarPatchEmbedWind(nn.Module):
             import torch.distributed as dist
             if not dist.is_initialized() or dist.get_rank() == 0:
                 print(f"Initializing wind scanner cache for {self.grid_h}x{self.grid_w} grid ({L_expected} patches)")
-            # CPU-only initialization to avoid device conflicts
-            self.wind_scanner = CachedWindScanning(self.grid_h, self.grid_w, num_sectors=num_sectors)
+
+            # DDP-SAFE: Load pre-computed cache (all ranks load same file, no deadlock!)
+            cache_path = '/scratch/project_462000640/ammar/aq_net2/wind_scanner_cache.pkl'
+            self.wind_scanner = CachedWindScanning(
+                self.grid_h, self.grid_w,
+                num_sectors=num_sectors,
+                cache_path=cache_path  # DDP-safe: load from disk!
+            )
     
     def reset_parameters(self):
         for idx in range(self.max_vars):

@@ -15,15 +15,16 @@ train:
   learning_rate: 0.000150
   weight_decay: 0.01
   devices: 8
-  num_nodes: 100
+  num_nodes: 32  # Reduced from 50 to 32 (256 GPUs) for stability
   accelerator: gpu
   strategy: ddp
+  find_unused_parameters: true  # Required for TopoFlow elevation mask (now properly used in DDPStrategy)
   precision: 32
   gradient_clip_val: 1.0
   log_every_n_steps: 25
   val_check_interval: 25
-  max_steps: 20000
-  epochs: 10
+  max_steps: 20000  # Primary stopping criterion (20k steps)
+  epochs: 100  # Backup: increased to avoid early stopping (steps take precedence)
   warmup_steps: 2000
   scheduler: cosine
   cosine_max_steps: 20000
@@ -105,12 +106,23 @@ model:
   drop_path: 0.1
   drop_rate: 0.1
   parallel_patch_embed: true
+
+  # TopoFlow: Elevation-based attention mask
+  use_physics_mask: true
+
+  # Disable other physics innovations (not used)
+  use_pollutant_cross_attn: false
+  use_hierarchical_physics: false
+  use_adaptive_wind_memory: false
+
+  # Fine-tune from baseline checkpoint (original - architecture matches current code)
+  checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt
 system:
   miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:
   logger:
-    name: OPTIMAL_16x32_WindScanning_20k_steps
-    project: aq_net2_steps_based
+    name: TopoFlow_FULL_WindScanning_ElevationMask_20k_steps
+    project: topoflow_full_evaluation
   trainer:
     default_root_dir: ./lightning_logs
     enable_checkpointing: true

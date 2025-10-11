@@ -3,10 +3,15 @@ TopoFlow: Complete Integration - Wind Reordering + Elevation Attention
 ========================================================================
 
 Combines TWO physics-guided innovations:
-1. Wind-guided patch reordering (dynamic sequence order)
-2. Elevation-based attention bias (topographic barriers)
+1. Wind-guided patch reordering (dynamic sequence order) - in embedding layer
+2. Elevation-based attention bias (topographic barriers) - PURE elevation only
 
-Both are optional and can be toggled independently via config.
+Key correction (based on supervisor feedback):
+- Elevation bias uses ADDITIVE bias BEFORE softmax (not multiplicative mask after)
+- No wind modulation in the mask - elevation barrier is independent of wind
+- Wind affects patch reordering (embedding), elevation affects attention (transformer)
+
+Both components are optional and can be toggled independently via config.
 
 Author: Ammar
 Date: 2025-10-09
@@ -21,11 +26,17 @@ from typing import Optional, Tuple
 
 class TopoFlowAttention(nn.Module):
     """
-    Complete physics-guided attention combining:
-    - Elevation-based bias (topographic barriers)
-    - Wind modulation (optional)
+    Physics-guided attention with PURE elevation-based bias.
 
-    This is the CORRECTED version using additive bias BEFORE softmax.
+    Physics principle:
+        - Uphill atmospheric transport is hindered by gravity
+        - Attention from low patch to high patch gets negative bias
+        - Bias added BEFORE softmax (standard masked attention)
+
+    CORRECTED implementation (per supervisor feedback):
+        - Additive bias before softmax (not multiplicative mask after)
+        - Pure elevation only (no wind modulation in mask)
+        - Learnable strength parameter (alpha)
     """
 
     def __init__(
@@ -35,8 +46,7 @@ class TopoFlowAttention(nn.Module):
         qkv_bias=False,
         attn_drop=0.,
         proj_drop=0.,
-        use_elevation_bias=True,
-        use_wind_modulation=True
+        use_elevation_bias=True
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -50,18 +60,13 @@ class TopoFlowAttention(nn.Module):
 
         # Configuration
         self.use_elevation_bias = use_elevation_bias
-        self.use_wind_modulation = use_wind_modulation
 
         if self.use_elevation_bias:
-            # Learnable parameters
+            # Learnable parameter: strength of elevation barrier
             self.elevation_alpha = nn.Parameter(torch.tensor(1.0))
 
-            if self.use_wind_modulation:
-                self.wind_beta = nn.Parameter(torch.tensor(0.3))
-
-            # Fixed constants
-            self.register_buffer('H_scale', torch.tensor(1000.0))  # 1km
-            self.register_buffer('wind_threshold', torch.tensor(5.0))  # 5 m/s
+            # Fixed constant: height scale (1km)
+            self.register_buffer('H_scale', torch.tensor(1000.0))
 
     def forward(
         self,
@@ -75,9 +80,9 @@ class TopoFlowAttention(nn.Module):
 
         Args:
             x: [B, N, C] token embeddings
-            elevation_patches: [B, N] elevation per patch (normalized [0,1])
-            u_wind: [B, H, W] horizontal wind (optional)
-            v_wind: [B, H, W] vertical wind (optional)
+            elevation_patches: [B, N] elevation per patch in meters
+            u_wind: [B, H, W] horizontal wind (not used in mask, kept for compatibility)
+            v_wind: [B, H, W] vertical wind (not used in mask, kept for compatibility)
 
         Returns:
             x: [B, N, C] attention output
@@ -94,9 +99,7 @@ class TopoFlowAttention(nn.Module):
 
         # Add elevation bias BEFORE softmax (if enabled)
         if self.use_elevation_bias and elevation_patches is not None:
-            elevation_bias = self._compute_elevation_bias(
-                elevation_patches, u_wind, v_wind
-            )  # [B, N, N]
+            elevation_bias = self._compute_elevation_bias(elevation_patches)  # [B, N, N]
 
             # Expand for heads
             elevation_bias = elevation_bias.unsqueeze(1).expand(
@@ -117,75 +120,50 @@ class TopoFlowAttention(nn.Module):
 
         return x
 
-    def _compute_elevation_bias(
-        self,
-        elevation_patches: torch.Tensor,
-        u_wind: Optional[torch.Tensor],
-        v_wind: Optional[torch.Tensor]
-    ) -> torch.Tensor:
+    def _compute_elevation_bias(self, elevation_patches: torch.Tensor) -> torch.Tensor:
         """
-        Compute elevation-based attention bias.
+        Compute elevation-based attention bias - PURE elevation only!
 
-        Physics:
-            - Uphill transport difficult → negative bias → reduced attention
-            - Downhill transport easy → zero bias → normal attention
-            - Strong wind can overcome barriers → modulate bias
+        Physics principle:
+            - Uphill transport (i → j where j is higher) is difficult
+              → negative bias → reduces attention probability
+            - Downhill transport (i → j where j is lower) is easy
+              → zero bias → normal attention (no penalty)
+            - Flat transport (same elevation) → zero bias → normal attention
 
         Args:
-            elevation_patches: [B, N]
-            u_wind: [B, H, W] (optional)
-            v_wind: [B, H, W] (optional)
+            elevation_patches: [B, N] elevation of each patch in meters
 
         Returns:
-            bias: [B, N, N] in ℝ (real values, can be negative)
+            bias: [B, N, N] additive attention bias (≤ 0, real values)
+                  bias[b, i, j] = penalty for attention from patch i to patch j
         """
         B, N = elevation_patches.shape
 
-        # Pairwise elevation differences
-        elev_i = elevation_patches.unsqueeze(2)  # [B, N, 1]
-        elev_j = elevation_patches.unsqueeze(1)  # [B, 1, N]
+        # Compute pairwise elevation differences
+        elev_i = elevation_patches.unsqueeze(2)  # [B, N, 1] - source patch elevation
+        elev_j = elevation_patches.unsqueeze(1)  # [B, 1, N] - target patch elevation
         elev_diff = elev_j - elev_i  # [B, N, N]
 
-        # Convert to bias (negative for uphill)
-        elev_diff_normalized = elev_diff / self.H_scale
+        # elev_diff[b, i, j] = elevation_j - elevation_i
+        #   > 0 : j is HIGHER than i (uphill transport)
+        #   < 0 : j is LOWER than i (downhill transport)
+        #   = 0 : same elevation (flat transport)
+
+        # Convert elevation difference to attention bias
+        # Only penalize UPHILL transport (ReLU keeps only positive differences)
+        elev_diff_normalized = elev_diff / self.H_scale  # Normalize by 1km
         elevation_bias = -self.elevation_alpha * F.relu(elev_diff_normalized)
 
-        # Wind modulation (optional)
-        if self.use_wind_modulation and u_wind is not None and v_wind is not None:
-            wind_strength = self._compute_wind_strength(u_wind, v_wind)  # [B, N]
+        # Result:
+        #   Uphill (Δh > 0): bias = -alpha * (Δh/1000) < 0  ← PENALTY
+        #   Downhill (Δh < 0): bias = 0  ← NO PENALTY
+        #   Flat (Δh = 0): bias = 0  ← NO PENALTY
 
-            # Wind factor: 0 (weak) to 1 (strong)
-            wind_avg = (wind_strength.unsqueeze(1) + wind_strength.unsqueeze(2)) / 2
-            wind_factor = torch.sigmoid(wind_avg - self.wind_threshold)
-
-            # Modulate: strong wind reduces barrier
-            modulation = 1.0 - self.wind_beta * wind_factor
-            elevation_bias = elevation_bias * modulation
-
-        # Clamp for stability
+        # Clamp for numerical stability (prevent extreme values)
         elevation_bias = torch.clamp(elevation_bias, min=-10.0, max=0.0)
 
-        return elevation_bias
-
-    def _compute_wind_strength(self, u_wind, v_wind):
-        """Compute wind magnitude per patch."""
-        B, H, W = u_wind.shape
-        wind_mag = torch.sqrt(u_wind**2 + v_wind**2 + 1e-8)
-
-        # Infer patch grid
-        grid_h = H // 2
-        grid_w = W // 2
-        patch_h = H // grid_h
-        patch_w = W // grid_w
-
-        # Average pool
-        wind_mag_4d = wind_mag.unsqueeze(1)
-        wind_per_patch = F.avg_pool2d(
-            wind_mag_4d,
-            kernel_size=(patch_h, patch_w),
-            stride=(patch_h, patch_w)
-        )
-        return wind_per_patch.squeeze(1).reshape(B, -1)
+        return elevation_bias  # [B, N, N], all values ≤ 0
 
 
 class TopoFlowBlock(nn.Module):
@@ -207,8 +185,7 @@ class TopoFlowBlock(nn.Module):
         qkv_bias=True,
         drop_path=0.,
         norm_layer=nn.LayerNorm,
-        use_elevation_bias=True,
-        use_wind_modulation=True
+        use_elevation_bias=True
     ):
         super().__init__()
 
@@ -219,8 +196,7 @@ class TopoFlowBlock(nn.Module):
             qkv_bias=qkv_bias,
             attn_drop=0.,
             proj_drop=0.,
-            use_elevation_bias=use_elevation_bias,
-            use_wind_modulation=use_wind_modulation
+            use_elevation_bias=use_elevation_bias
         )
 
         self.drop_path = nn.Identity() if drop_path == 0. else nn.Identity()
@@ -301,10 +277,9 @@ def get_topoflow_config(mode: str) -> dict:
     Args:
         mode: One of:
             - "baseline": No physics (standard ViT)
-            - "elevation_only": Elevation bias only
-            - "elevation_wind": Elevation + wind modulation
-            - "wind_reorder_only": Wind reordering only (in embedding layer)
-            - "full": Wind reordering + elevation attention (FULL TopoFlow)
+            - "elevation_only": Elevation bias only (no wind reordering)
+            - "wind_reorder_only": Wind reordering only (no elevation bias)
+            - "full": Wind reordering + elevation bias (FULL TopoFlow)
 
     Returns:
         config: Dictionary with settings
@@ -313,27 +288,18 @@ def get_topoflow_config(mode: str) -> dict:
         "baseline": {
             "use_wind_reordering": False,
             "use_elevation_bias": False,
-            "use_wind_modulation": False,
         },
         "elevation_only": {
             "use_wind_reordering": False,
             "use_elevation_bias": True,
-            "use_wind_modulation": False,
-        },
-        "elevation_wind": {
-            "use_wind_reordering": False,
-            "use_elevation_bias": True,
-            "use_wind_modulation": True,
         },
         "wind_reorder_only": {
             "use_wind_reordering": True,
             "use_elevation_bias": False,
-            "use_wind_modulation": False,
         },
         "full": {
             "use_wind_reordering": True,
             "use_elevation_bias": True,
-            "use_wind_modulation": True,
         }
     }
 
@@ -366,7 +332,7 @@ def example_usage():
     print(f"✓ Elevation patches: {elevation_patches.shape}")
 
     # Test different modes
-    modes = ["baseline", "elevation_only", "elevation_wind"]
+    modes = ["baseline", "elevation_only", "full"]
 
     for mode in modes:
         config = get_topoflow_config(mode)
@@ -376,8 +342,7 @@ def example_usage():
         block = TopoFlowBlock(
             dim=C,
             num_heads=num_heads,
-            use_elevation_bias=config["use_elevation_bias"],
-            use_wind_modulation=config["use_wind_modulation"]
+            use_elevation_bias=config["use_elevation_bias"]
         )
 
         output = block(x, elevation_patches, u_wind, v_wind)

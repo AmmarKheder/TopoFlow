@@ -141,10 +141,9 @@ class ClimaX(nn.Module):
                     qkv_bias=True,
                     drop_path=dpr[0],
                     norm_layer=nn.LayerNorm,
-                    use_elevation_bias=True,
-                    use_wind_modulation=True
+                    use_elevation_bias=True
                 )
-                print(f"✅ TopoFlow enabled: block 0, grid {grid_h}×{grid_w}, elevation+wind")
+                print(f"✅ TopoFlow enabled: block 0, grid {grid_h}×{grid_w}, elevation bias only")
         
         # Layer normalization after transformer blocks
         self.norm = nn.LayerNorm(embed_dim)

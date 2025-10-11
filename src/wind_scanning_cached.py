@@ -17,29 +17,116 @@ class CachedWindScanning:
     pre-compute 16 orders (one per wind sector) and map dynamically.
     """
     
-    def __init__(self, grid_h: int, grid_w: int, num_sectors: int = 16):
+    def __init__(self, grid_h: int, grid_w: int, num_sectors: int = 16, cache_path: str = None):
         self.grid_h = grid_h
         self.grid_w = grid_w
         self.num_sectors = num_sectors
         self.num_patches = grid_h * grid_w
-        
+
         # # # # #  DYNAMIC 32?# 64 configuration
         self.regions_h = 32  # Number of region rows
         self.regions_w = 32  # Number of region columns
         self.total_regions = self.regions_h * self.regions_w  # 1024 total (32x32)
-        
+
         # Pre-compute sector angles (in radians)
         self.sector_angles = [
             (2 * math.pi * i / num_sectors) for i in range(num_sectors)
         ]
-        
+
         # Cache for reorder indices per sector
         self.cached_orders = {}
-        self._precompute_all_orders()
-
-        # Regional cache for 32x32 regions
         self.regional_cached_orders = {}
-        self._precompute_regional_orders_32x32()
+
+        # Try to load from disk first if cache_path provided
+        if cache_path and self._load_cache_from_disk(cache_path):
+            import torch.distributed as dist
+            if not dist.is_initialized() or dist.get_rank() == 0:
+                print(f"✅ Loaded pre-computed wind scanner cache from {cache_path}")
+            return
+
+        # Otherwise initialize cache with DDP awareness
+        self._init_cache_ddp_safe()
+
+    def _init_cache_ddp_safe(self):
+        """Initialize cache with DDP awareness - only rank 0 computes, then broadcasts."""
+        import torch.distributed as dist
+
+        is_ddp = dist.is_initialized()
+        rank = dist.get_rank() if is_ddp else 0
+
+        if rank == 0:
+            # Only rank 0 computes the cache
+            self._precompute_all_orders()
+            self._precompute_regional_orders_32x32()
+
+        if is_ddp:
+            # Barrier: wait for rank 0 to finish
+            dist.barrier()
+
+            # Broadcast cached_orders
+            if rank == 0:
+                cache_list = [self.cached_orders[i] for i in range(self.num_sectors)]
+            else:
+                cache_list = [torch.zeros(self.num_patches, dtype=torch.long) for _ in range(self.num_sectors)]
+
+            for i, tensor in enumerate(cache_list):
+                dist.broadcast(tensor, src=0)
+                if rank != 0:
+                    self.cached_orders[i] = tensor
+
+            # Broadcast regional_cached_orders
+            if rank == 0:
+                regional_flat = []
+                for region_idx in range(self.total_regions):
+                    for sector_idx in range(self.num_sectors):
+                        regional_flat.append(self.regional_cached_orders[region_idx][sector_idx])
+            else:
+                patches_per_region = (self.grid_h // self.regions_h) * (self.grid_w // self.regions_w)
+                regional_flat = [torch.zeros(patches_per_region, dtype=torch.long)
+                               for _ in range(self.total_regions * self.num_sectors)]
+
+            for tensor in regional_flat:
+                dist.broadcast(tensor, src=0)
+
+            # Reconstruct regional cache on non-rank-0
+            if rank != 0:
+                idx = 0
+                for region_idx in range(self.total_regions):
+                    self.regional_cached_orders[region_idx] = {}
+                    for sector_idx in range(self.num_sectors):
+                        self.regional_cached_orders[region_idx][sector_idx] = regional_flat[idx]
+                        idx += 1
+
+            dist.barrier()
+
+    def _load_cache_from_disk(self, cache_path: str) -> bool:
+        """Load pre-computed cache from disk (DDP-safe!)."""
+        import pickle
+        import os
+
+        if not os.path.exists(cache_path):
+            return False
+
+        try:
+            with open(cache_path, 'rb') as f:
+                cache_data = pickle.load(f)
+
+            # Validate cache matches current configuration
+            if (cache_data['grid_h'] != self.grid_h or
+                cache_data['grid_w'] != self.grid_w or
+                cache_data['num_sectors'] != self.num_sectors):
+                print(f"⚠️  Cache mismatch: expected {self.grid_h}x{self.grid_w}, got {cache_data['grid_h']}x{cache_data['grid_w']}")
+                return False
+
+            # Load all cache data
+            self.sector_angles = cache_data['sector_angles']
+            self.cached_orders = cache_data['cached_orders']
+            self.regional_cached_orders = cache_data['regional_cached_orders']
+
+            return True
+        except Exception as e:
+            print(f"⚠️  Failed to load cache: {e}")
+            return False
 
     def _precompute_all_orders(self):
         """Pre-compute patch reordering for all wind sectors."""

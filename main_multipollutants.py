@@ -2,9 +2,11 @@ import os
 import sys
 import argparse
 import subprocess
+from datetime import timedelta
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning.strategies import DDPStrategy
 from src.config_manager import ConfigManager
 from src.datamodule_fixed import AQNetDataModule
 from src.model_multipollutants import MultiPollutantLightningModule as PM25LightningModule
@@ -18,6 +20,9 @@ def main(config_path):
         local_rank = int(os.environ["SLURM_LOCALID"])
     else:
         local_rank = 0  # default (single-GPU run)
+
+    # SLURM handles GPU binding - don't restrict visibility per-process
+    # (Setting ROCR_VISIBLE_DEVICES per-process breaks DDP on LUMI)
 
     torch.cuda.set_device(local_rank)
     print(f"# # # #  Bound process to cuda:{local_rank} "
@@ -43,23 +48,14 @@ def main(config_path):
     # Initialize Model (with optional checkpoint loading)
     print("# # # #  Initialisation du modèle multi-polluants...")
 
-    # Check if checkpoint path is provided in config
-    checkpoint_path = config.get('model', {}).get('checkpoint_path', None)
+    # Create model (Lightning will load checkpoint automatically via trainer.fit(ckpt_path=...))
+    model = PM25LightningModule(config=config)
 
-    if checkpoint_path and os.path.exists(checkpoint_path):
-        print(f"# # # #  Loading from checkpoint: {checkpoint_path}")
-        print("# # # #  Mode: Fine-tuning (strict=False allows new modules)")
-        model = PM25LightningModule.load_from_checkpoint(
-            checkpoint_path,
-            config=config,
-            strict=False  # Allow adding new innovations
-        )
-        print("# # # #  Checkpoint loaded successfully (innovations will be randomly initialized)")
+    checkpoint_path = config.get('model', {}).get('checkpoint_path', None)
+    if checkpoint_path:
+        print(f"# # # #  Will resume from checkpoint: {checkpoint_path}")
     else:
-        if checkpoint_path:
-            print(f"# # # #  WARNING: Checkpoint not found: {checkpoint_path}")
-        print("# # # #  Creating new model from scratch...")
-        model = PM25LightningModule(config=config)
+        print("# # # #  Training from scratch (no checkpoint)")
 
     print("# # # #  Modèle multi-polluants initialisé")
     
@@ -93,15 +89,31 @@ def main(config_path):
             filename=config['callbacks']['model_checkpoint']['filename']
         )
     ]
-    
+
+    # ============================================
+    # CRITICAL FIX: Properly configure DDP strategy
+    # ============================================
+    # Create DDPStrategy with find_unused_parameters from config
+    find_unused = config['train'].get('find_unused_parameters', False)
+
+    if config['train']['strategy'] == 'ddp' and config["train"]["num_nodes"] > 1:
+        strategy = DDPStrategy(
+            find_unused_parameters=find_unused,
+            timeout=timedelta(seconds=7200)  # 2 hours timeout for 400 GPUs (must be timedelta)
+        )
+        print(f"# # # #  DDPStrategy configured: find_unused_parameters={find_unused}, timeout=2h")
+    else:
+        strategy = config['train']['strategy']
+
     # Trainer
     trainer = pl.Trainer(
         num_nodes=config["train"]["num_nodes"],
         devices=config['train']['devices'],
         accelerator=config['train']['accelerator'],
-        strategy=config['train']['strategy'],
+        strategy=strategy,  # Use configured DDPStrategy object
         precision=config['train']['precision'],
         max_epochs=config['train']['epochs'],
+        max_steps=config['train'].get('max_steps', -1),  # Use max_steps if specified
         logger=[tb_logger, csv_logger],
         callbacks=callbacks,
         gradient_clip_val=config['train']['gradient_clip_val'],
@@ -111,7 +123,7 @@ def main(config_path):
         default_root_dir=config['lightning']['trainer']['default_root_dir'],
         enable_checkpointing=config['lightning']['trainer']['enable_checkpointing'],
         enable_model_summary=config['lightning']['trainer']['enable_model_summary'],
-        num_sanity_val_steps=1  # # # # #  TEST: 1 seul step pour debug device mismatch
+        num_sanity_val_steps=2  # Increased from 1 to 2 for better stability check
     )
     
     print("\n" + "="*60)
@@ -122,10 +134,37 @@ def main(config_path):
     print(f"# # � GPUs: {config['train']['devices']}")
     print(f"# # # #  Batch size: {config['train']['batch_size']} par GPU")
     print("# # # #  SANITY CHECK: 1 step seulement (debug device mismatch)")
+
     print("="*60 + "\n")
-    
-    # Start training
-    trainer.fit(model, data_module)
+
+    # Resume training from checkpoint if specified
+    ckpt_path = config['model'].get('checkpoint_path', None)
+
+    if ckpt_path:
+        print(f"\n# # # #  Loading checkpoint with strict=False: {ckpt_path}")
+        print("# # # #  Reason: Block 0 attention architecture changed")
+
+        # Load checkpoint manually with strict=False
+        checkpoint = torch.load(ckpt_path, map_location='cpu')
+
+        # Load state_dict with strict=False to handle architecture changes
+        result = model.load_state_dict(checkpoint['state_dict'], strict=False)
+
+        # Show what was missing/unexpected
+        if result.missing_keys:
+            print(f"\n⚠️  Missing keys (will be randomly initialized): {len(result.missing_keys)}")
+            print(f"   First few: {result.missing_keys[:5]}")
+        if result.unexpected_keys:
+            print(f"⚠️  Unexpected keys (ignored): {len(result.unexpected_keys)}")
+            print(f"   First few: {result.unexpected_keys[:5]}")
+
+        print("✅ Checkpoint loaded successfully with partial match\n")
+
+        # Don't pass ckpt_path to trainer.fit() - we already loaded it manually
+        trainer.fit(model, data_module)
+    else:
+        print("# # # #  Training from scratch (no checkpoint)")
+        trainer.fit(model, data_module)
     
     print("\n# # # #  ENTRA�# NEMENT TERMIN�# !")
     
