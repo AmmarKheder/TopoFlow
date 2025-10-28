@@ -10,9 +10,10 @@ import numpy as np
 from typing import Tuple
 
 from src.climax_core.arch import ClimaX
-from src.models.pollutant_cross_attn import PollutantCrossAttentionWrapper
-from src.models.hierarchical_physics import HierarchicalPhysicsTransformer
-from src.models.adaptive_wind_memory import AdaptiveWindMemory
+# Disabled modules (not used in current configuration)
+# from src.models.pollutant_cross_attn import PollutantCrossAttentionWrapper
+# from src.models.hierarchical_physics import HierarchicalPhysicsTransformer
+# from src.models.adaptive_wind_memory import AdaptiveWindMemory
 
 
 def ensure_tuple(variables):
@@ -50,6 +51,7 @@ class MultiPollutantModel(nn.Module):
             mlp_ratio=config["model"]["mlp_ratio"],
             scan_order=config.get("model", {}).get("scan_order", "hilbert"),
             parallel_patch_embed=config.get("model", {}).get("parallel_patch_embed", False),
+            use_physics_mask=config.get("model", {}).get("use_physics_mask", False),
         )
 
         # Indices des variables cibles

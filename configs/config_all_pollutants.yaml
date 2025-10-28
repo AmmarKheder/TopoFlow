@@ -107,22 +107,22 @@ model:
   drop_rate: 0.1
   parallel_patch_embed: true
 
-  # TopoFlow: Elevation-based attention mask
-  # DISABLED for wind scanning only test
-  use_physics_mask: false
+  # TopoFlow: Elevation-based attention mask in block 0
+  # ENABLED for fine-tuning from wind baseline
+  use_physics_mask: true
 
   # Disable other physics innovations (not used)
   use_pollutant_cross_attn: false
   use_hierarchical_physics: false
   use_adaptive_wind_memory: false
 
-  # Resume training from checkpoint 0.35 (wind scanning)
-  checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt
+  # Resume training from checkpoint 0.293 (wind scanning - job 13968302)
+  checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_144/checkpoints/best-val_loss_val_loss=0.2931-step_step=408.ckpt
 system:
   miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:
   logger:
-    name: RESUME_WindScanning_from_0.35
+    name: TopoFlow_Block0_from_Wind_0.293
     project: topoflow_comparison
   trainer:
     default_root_dir: ./lightning_logs

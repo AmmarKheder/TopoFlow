@@ -14,6 +14,7 @@ from src.climax_core.utils.pos_embed import (
 )
 
 from src.climax_core.parallelpatchembed_wind import ParallelVarPatchEmbedWind as ParallelVarPatchEmbed
+from src.climax_core.topoflow import PhysicsGuidedBlock, compute_patch_elevations
 
 
 class ClimaX(nn.Module):
@@ -48,6 +49,7 @@ class ClimaX(nn.Module):
         drop_rate=0.1,
         parallel_patch_embed=False,
         scan_order="hilbert",
+        use_physics_mask=False,
     ):
         super().__init__()
 
@@ -56,6 +58,7 @@ class ClimaX(nn.Module):
         self.patch_size = patch_size
         self.default_vars = default_vars
         self.parallel_patch_embed = parallel_patch_embed
+        self.use_physics_mask = use_physics_mask
         # variable tokenization: separate embedding layer for each input variable
         self.scan_order = scan_order
         if self.parallel_patch_embed:
@@ -84,19 +87,36 @@ class ClimaX(nn.Module):
         # ViT backbone
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path, depth)]  # stochastic depth decay rule
-        self.blocks = nn.ModuleList(
-            [
-                Block(
-                    embed_dim,
-                    num_heads,
-                    mlp_ratio,
-                    qkv_bias=True,
-                    drop_path=dpr[i],
-                    norm_layer=nn.LayerNorm,
+
+        # Build blocks: Block 0 with TopoFlow if enabled, rest with standard attention
+        self.blocks = nn.ModuleList()
+        for i in range(depth):
+            if i == 0 and self.use_physics_mask:
+                # Block 0: Physics-guided attention with elevation bias
+                self.blocks.append(
+                    PhysicsGuidedBlock(
+                        dim=embed_dim,
+                        num_heads=num_heads,
+                        mlp_ratio=mlp_ratio,
+                        qkv_bias=True,
+                        drop=drop_rate,
+                        attn_drop=drop_rate,
+                        drop_path=dpr[i],
+                        norm_layer=nn.LayerNorm,
+                    )
                 )
-                for i in range(depth)
-            ]
-        )
+            else:
+                # Blocks 1-5: Standard ViT attention
+                self.blocks.append(
+                    Block(
+                        embed_dim,
+                        num_heads,
+                        mlp_ratio,
+                        qkv_bias=True,
+                        drop_path=dpr[i],
+                        norm_layer=nn.LayerNorm,
+                    )
+                )
         self.norm = nn.LayerNorm(embed_dim)
 
         # --------------------------------------------------------------------------
@@ -206,6 +226,14 @@ class ClimaX(nn.Module):
         if isinstance(variables, list):
             variables = tuple(variables)
 
+        # Extract elevation field if physics mask is enabled
+        elevation_field = None
+        if self.use_physics_mask:
+            # Find elevation variable index
+            if 'elevation' in variables:
+                elev_idx = variables.index('elevation')
+                elevation_field = x[:, elev_idx, :, :]  # [B, H, W]
+
         # tokenize each variable separately
         embeds = []
         var_ids = self.get_var_ids(variables, x.device)
@@ -235,9 +263,19 @@ class ClimaX(nn.Module):
 
         x = self.pos_drop(x)
 
+        # Compute patch-level elevations if physics mask enabled
+        elevation_patches = None
+        if self.use_physics_mask and elevation_field is not None:
+            elevation_patches = compute_patch_elevations(elevation_field, self.patch_size)  # [B, N]
+
         # apply Transformer blocks
-        for blk in self.blocks:
-            x = blk(x)
+        for i, blk in enumerate(self.blocks):
+            if i == 0 and self.use_physics_mask and elevation_patches is not None:
+                # Block 0 with elevation bias
+                x = blk(x, elevation_patches)
+            else:
+                # Standard blocks
+                x = blk(x)
         x = self.norm(x)
 
         return x
