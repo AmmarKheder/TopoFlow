@@ -15,7 +15,7 @@ train:
   learning_rate: 0.0001  # CRITICAL: Must match checkpoint version_47 base_lr for proper resume!
   weight_decay: 0.01
   devices: 8
-  num_nodes: 32  # Reduced from 50 to avoid segfaults on 400 GPUs
+  num_nodes: 16  # Reduced from 32 to 16 for faster RCCL initialization (128 GPUs)
   accelerator: gpu
   strategy: ddp
   find_unused_parameters: true  # Required for TopoFlow elevation mask (now properly used in DDPStrategy)
@@ -116,8 +116,9 @@ model:
   use_hierarchical_physics: false
   use_adaptive_wind_memory: false
 
-  # Resume training from checkpoint 0.293 (wind scanning - job 13968302)
-  checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_144/checkpoints/best-val_loss_val_loss=0.2931-step_step=408.ckpt
+  # Resume training from checkpoint 0.293 (weights only - optimizer state removed)
+  # Using weights_only version to avoid optimizer state incompatibility
+  checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_144/checkpoints/weights_only_best-val_loss_val_loss=0.2931-step_step=408.ckpt
 system:
   miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopoFlow - Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .slide {
+            background: white;
+            border-radius: 20px;
+            padding: 60px;
+            max-width: 1600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #2d3748;
+            font-size: 3.5em;
+            margin-bottom: 15px;
+            text-align: center;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #4a5568;
+            font-size: 1.4em;
+            margin-bottom: 40px;
+        }
+
+        .stats-header {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            opacity: 0;
+            transform: scale(0.8);
+            animation: popIn 0.6s ease-out forwards;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.2s; }
+        .stat-card:nth-child(2) { animation-delay: 0.4s; }
+        .stat-card:nth-child(3) { animation-delay: 0.6s; }
+        .stat-card:nth-child(4) { animation-delay: 0.8s; }
+
+        .stat-card .number {
+            font-size: 3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .china-map-section {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 30px;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 1s forwards;
+        }
+
+        .china-map-section h2 {
+            color: #2d3748;
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 3px solid #11998e;
+        }
+
+        .china-outline {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 80%;
+        }
+
+        .china-region {
+            fill: #11998e;
+            opacity: 0;
+            animation: fillRegion 2s ease-out 1.5s forwards;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 32px 32px;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 2s forwards;
+        }
+
+        .coverage-label {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(17, 153, 142, 0.95);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.2em;
+            opacity: 0;
+            animation: slideUp 0.8s ease-out 2.5s forwards;
+        }
+
+        .metrics-section {
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 1.2s forwards;
+        }
+
+        .metrics-section h2 {
+            color: #2d3748;
+            font-size: 2em;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .pollutant-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .pollutant-card {
+            background: white;
+            border-left: 5px solid #11998e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideInRight 0.6s ease-out forwards;
+        }
+
+        .pollutant-card:nth-child(1) { animation-delay: 1.4s; border-color: #e74c3c; }
+        .pollutant-card:nth-child(2) { animation-delay: 1.5s; border-color: #f39c12; }
+        .pollutant-card:nth-child(3) { animation-delay: 1.6s; border-color: #3498db; }
+        .pollutant-card:nth-child(4) { animation-delay: 1.7s; border-color: #9b59b6; }
+        .pollutant-card:nth-child(5) { animation-delay: 1.8s; border-color: #1abc9c; }
+        .pollutant-card:nth-child(6) { animation-delay: 1.9s; border-color: #2ecc71; }
+
+        .pollutant-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .pollutant-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .pollutant-formula {
+            font-size: 1.1em;
+            color: #718096;
+            font-family: 'Courier New', monospace;
+        }
+
+        .horizon-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .horizon-box {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .horizon-label {
+            font-size: 0.85em;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .horizon-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .performance-summary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 35px;
+            border-radius: 15px;
+            margin-top: 40px;
+            text-align: center;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 2.2s forwards;
+        }
+
+        .performance-summary h2 {
+            font-size: 2.2em;
+            margin-bottom: 20px;
+        }
+
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .performance-item {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .performance-item .title {
+            font-size: 1em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .performance-item .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        @keyframes popIn {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .china-map-section,
+        .metrics-section {
+            transform: translateY(20px);
+        }
+
+        @keyframes slideInRight {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fillRegion {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            100% {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .highlight {
+            background: rgba(255,255,255,0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .slide {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="slide">
+        <h1>TopoFlow: Experimental Results</h1>
+        <p class="subtitle">Multi-Pollutant Air Quality Forecasting - Test Year 2018 (China Region)</p>
+
+        <div class="stats-header">
+            <div class="stat-card">
+                <div class="number">800</div>
+                <div class="label">GPUs (LUMI)</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">6</div>
+                <div class="label">Pollutant Species</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">4</div>
+                <div class="label">Forecast Horizons</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">34.5%</div>
+                <div class="label">China Coverage</div>
+            </div>
+        </div>
+
+        <div class="results-container">
+            <div class="china-map-section">
+                <h2>Study Region: China & Taiwan</h2>
+                <div class="map-container">
+                    <svg class="china-outline" viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Simplified China outline -->
+                        <path class="china-region" d="
+                            M 100 100
+                            L 150 80 L 200 85 L 250 75 L 300 80 L 350 90 L 380 110
+                            L 400 140 L 410 180 L 405 220 L 390 260 L 370 290
+                            L 340 310 L 300 320 L 250 315 L 200 305 L 150 290
+                            L 120 260 L 100 220 L 95 180 L 100 140 Z
+                            M 420 330 L 425 340 L 420 350 L 410 345 Z
+                        " stroke="#0d7377" stroke-width="2"/>
+                    </svg>
+                    <div class="grid-overlay"></div>
+                    <div class="coverage-label">128 × 256 Grid | 11,317 Active Pixels</div>
+                </div>
+            </div>
+
+            <div class="metrics-section">
+                <h2>Performance Metrics (RMSE)</h2>
+                <div class="pollutant-grid">
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">PM2.5</span>
+                            <span class="pollutant-formula">Fine Particulate Matter</span>
+                        </div>
+                        <div class="horizon-metrics">
+                            <div class="horizon-box">
+                                <div class="horizon-label">12h</div>
+                                <div class="horizon-value">10.72</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">24h</div>
+                                <div class="horizon-value">12.67</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">48h</div>
+                                <div class="horizon-value">12.21</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">96h</div>
+                                <div class="horizon-value">13.40</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">PM10</span>
+                            <span class="pollutant-formula">Coarse Particulate Matter</span>
+                        </div>
+                        <div class="horizon-metrics">
+                            <div class="horizon-box">
+                                <div class="horizon-label">12h</div>
+                                <div class="horizon-value">17.90</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">24h</div>
+                                <div class="horizon-value">20.29</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">48h</div>
+                                <div class="horizon-value">19.85</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">96h</div>
+                                <div class="horizon-value">21.63</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">SO₂</span>
+                            <span class="pollutant-formula">Sulfur Dioxide</span>
+                        </div>
+                        <div class="horizon-metrics">
+                            <div class="horizon-box">
+                                <div class="horizon-label">12h</div>
+                                <div class="horizon-value">2.89</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">24h</div>
+                                <div class="horizon-value">2.88</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">48h</div>
+                                <div class="horizon-value">2.81</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">96h</div>
+                                <div class="horizon-value">3.27</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">NO₂</span>
+                            <span class="pollutant-formula">Nitrogen Dioxide</span>
+                        </div>
+                        <div class="horizon-metrics">
+                            <div class="horizon-box">
+                                <div class="horizon-label">12h</div>
+                                <div class="horizon-value">9.75</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">24h</div>
+                                <div class="horizon-value">9.16</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">48h</div>
+                                <div class="horizon-value">9.33</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">96h</div>
+                                <div class="horizon-value">10.13</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">CO</span>
+                            <span class="pollutant-formula">Carbon Monoxide</span>
+                        </div>
+                        <div class="horizon-metrics">
+                            <div class="horizon-box">
+                                <div class="horizon-label">12h</div>
+                                <div class="horizon-value">48.98</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">24h</div>
+                                <div class="horizon-value">48.06</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">48h</div>
+                                <div class="horizon-value">48.65</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">96h</div>
+                                <div class="horizon-value">54.02</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pollutant-card">
+                        <div class="pollutant-header">
+                            <span class="pollutant-name">O₃</span>
+                            <span class="pollutant-formula">Ozone</span>
+                        </div>
+                        <div class="horizon-metrics">
+                            <div class="horizon-box">
+                                <div class="horizon-label">12h</div>
+                                <div class="horizon-value">24.06</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">24h</div>
+                                <div class="horizon-value">19.97</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">48h</div>
+                                <div class="horizon-value">21.13</div>
+                            </div>
+                            <div class="horizon-box">
+                                <div class="horizon-label">96h</div>
+                                <div class="horizon-value">21.44</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="performance-summary">
+            <h2>Training Performance</h2>
+            <div class="performance-grid">
+                <div class="performance-item">
+                    <div class="title">Training Infrastructure</div>
+                    <div class="value">100 nodes</div>
+                </div>
+                <div class="performance-item">
+                    <div class="title">Validation Loss</div>
+                    <div class="value">0.3557</div>
+                </div>
+                <div class="performance-item">
+                    <div class="title">Test Samples</div>
+                    <div class="value">4,000</div>
+                </div>
+                <div class="performance-item">
+                    <div class="title">Active Pixels</div>
+                    <div class="value">11,317</div>
+                </div>
+                <div class="performance-item">
+                    <div class="title">Training Duration</div>
+                    <div class="value">~48h</div>
+                </div>
+                <div class="performance-item">
+                    <div class="title">Max Steps</div>
+                    <div class="value">20,000</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Optional: Add interactivity for pollutant cards
+        document.querySelectorAll('.pollutant-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateX(0) scale(1.02)';
+                this.style.transition = 'transform 0.3s ease';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateX(0) scale(1)';
+            });
+        });
+
+        // Animate the China region pulsing
+        const chinaRegion = document.querySelector('.china-region');
+        setInterval(() => {
+            chinaRegion.style.transition = 'opacity 2s ease-in-out';
+            chinaRegion.style.opacity = chinaRegion.style.opacity === '0.6' ? '0.9' : '0.6';
+        }, 2000);
+    </script>
+</body>
+</html>

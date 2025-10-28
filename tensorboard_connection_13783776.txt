@@ -1,0 +1,15 @@
+==============================================
+🔗 TENSORBOARD CONNECTION INFO
+==============================================
+Job ID: 13783776
+Node: nid005345
+Port: 6896
+
+To connect from your local machine:
+
+1. Open a new terminal locally
+2. Create SSH tunnel:
+   ssh -L 6006:nid005345:6896 khederam@lumi.csc.fi
+
+3. Open browser: http://localhost:6006
+==============================================

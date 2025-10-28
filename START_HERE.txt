@@ -1,0 +1,96 @@
+================================================================================
+🌅 QUAND TU TE RÉVEILLES - COMMENCE ICI
+================================================================================
+
+Date: 2025-10-15
+Problème: TopoFlow fine-tuning bloqué pendant 6+ heures sans démarrer Python
+Solution testée: Fix de propagation du venv avec srun
+
+================================================================================
+📍 ÉTAPE 1: VÉRIFIER L'ÉTAT DES JOBS
+================================================================================
+
+Lance ce script:
+    ./CHECK_ALL_STATUS.sh
+
+OU manuellement:
+    squeue -u $USER
+
+Si jobs terminés:
+    sacct -j 13589032,13589754 --format=JobID,State,Elapsed
+
+================================================================================
+📍 ÉTAPE 2: VÉRIFIER LES LOGS
+================================================================================
+
+Test venv (4 GPUs):
+    cat logs/test_venv_13589754.out
+
+Job principal (32 GPUs):
+    tail -50 logs/topoflow_full_finetune_13589032.err | grep -v amdgpu
+
+Auto-monitoring:
+    tail -30 AUTO_MONITOR_13589032.log
+
+================================================================================
+📍 ÉTAPE 3: INTERPRÉTER LES RÉSULTATS
+================================================================================
+
+✅ SI TU VOIS "LOCAL_RANK: X - CUDA_VISIBLE_DEVICES" dans les logs:
+   → SUCCESS! Python démarre correctement
+   → Passe à l'étape 4
+
+❌ SI TU VOIS "All distributed processes registered" MAIS PAS de LOCAL_RANK:
+   → Job encore bloqué, venv fix n'a pas marché
+   → Lis DEBUG_SUMMARY.md pour solutions alternatives
+
+⏳ SI JOBS ENCORE "PENDING":
+   → Ils attendent dans la queue
+   → Re-vérifie dans 15-30 minutes
+
+================================================================================
+📍 ÉTAPE 4: SI ÇA MARCHE - LANCER 128 GPUs
+================================================================================
+
+Éditer le script:
+    nano submit_multipollutants_from_6pollutants.sh
+
+Changer:
+    #SBATCH --nodes=4      →  #SBATCH --nodes=16
+    echo "32 GPUs"          →  echo "128 GPUs"
+
+Lancer:
+    sbatch submit_multipollutants_from_6pollutants.sh
+
+Monitorer:
+    watch -n 60 'squeue -u $USER'
+
+================================================================================
+📁 FICHIERS IMPORTANTS
+================================================================================
+
+STATUS_WHEN_YOU_WAKE_UP.md  → Explication complète du problème et solutions
+DEBUG_SUMMARY.md             → Analyse technique détaillée
+CHECK_ALL_STATUS.sh          → Script de vérification rapide
+monitor_13589032.sh          → Monitoring manuel du job principal
+
+================================================================================
+❓ SI PROBLÈMES
+================================================================================
+
+1. Venv test échoue → Besoin de Singularity container
+2. Job bloque encore → Test avec 8 nodes (64 GPUs) d'abord
+3. Python démarre mais erreurs → Vérifie les messages d'erreur spécifiques
+
+================================================================================
+🎯 OBJECTIF FINAL
+================================================================================
+
+Fine-tune TopoFlow sur 128 GPUs
+Checkpoint: best-val_loss=0.3557-step=311
+Training devrait démarrer à loss ~0.35
+Temps attendu: Quelques minutes pour démarrer (PAS 6 heures!)
+
+================================================================================
+Mode automatique terminé - Bonne chance! 🚀
+================================================================================

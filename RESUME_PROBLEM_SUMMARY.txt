@@ -1,0 +1,189 @@
+================================================================================
+RÉSUMÉ COMPLET DU PROBLÈME - OPTIMIZER STATE RESUME
+================================================================================
+Date: 2025-10-20
+Job en cours: 13787155 (PENDING - 50 nodes)
+
+================================================================================
+CONTEXTE DU PROBLÈME
+================================================================================
+
+L'utilisateur veut faire du RESUME (pas fine-tuning!) depuis le checkpoint:
+  logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt
+
+Ce checkpoint a été créé avec:
+  - epoch 3, step 311
+  - train_loss ~0.7, val_loss=0.3557
+  - learning_rate: 0.0001
+  - accumulate_grad_batches: 2
+  - epochs: 10 (T_max pour CosineAnnealingLR)
+  - num_nodes: 50
+  - 91 paramètres trainables
+  - 4 param_groups dans l'optimizer:
+    * Group 0: 72 params (vit_blocks), lr=8.145034e-06
+    * Group 1: 2 params (wind_embedding), lr=1.589846e-04
+    * Group 2: 6 params (head), lr=3.990074e-05
+    * Group 3: 11 params (others), lr=7.959537e-05
+
+================================================================================
+LE PROBLÈME
+================================================================================
+
+Quand on fait trainer.fit(model, data_module, ckpt_path=...), PyTorch Lightning:
+1. ✅ Charge les model weights correctement (0 missing keys)
+2. ❌ NE charge PAS l'optimizer state en DDP multi-node (silent fail!)
+3. Résultat: train_loss démarre à ~3.8-3.9 au lieu de ~0.7
+
+Pourquoi le silent fail?
+- PyTorch utilise des IDs Python (0-90) pour mapper les paramètres dans l'optimizer
+- Ces IDs changent à chaque création du modèle
+- En DDP multi-node, les IDs ne correspondent pas → fail silencieux
+
+================================================================================
+SOLUTIONS TENTÉES (ÉCHECS)
+================================================================================
+
+1. ❌ Remapper les IDs (0→90) dans on_load_checkpoint
+   → Ne marche pas car PyTorch utilise des object IDs Python, pas des indices
+
+2. ❌ Vider checkpoint['optimizer_states'] et charger dans on_train_batch_start
+   → Trop tard! Le premier batch a déjà été calculé
+
+3. ❌ Charger dans on_train_epoch_start
+   → Hook pas appelé si max_steps trop petit
+
+================================================================================
+SOLUTION FINALE IMPLÉMENTÉE (EN TEST)
+================================================================================
+
+La solution est de charger l'optimizer state IMMÉDIATEMENT après création 
+de l'optimizer dans configure_optimizers():
+
+FICHIER: src/model_multipollutants.py
+
+1. Hook on_load_checkpoint() (lignes ~466-548):
+   - Stocke le checkpoint optimizer state dans self._stored_ckpt_opt_state
+   - Inclut: id_to_name mapping, ckpt_state, ckpt_param_groups, sch_state
+   - NE vide PAS checkpoint['optimizer_states'] (laisse Lightning essayer)
+
+2. Méthode configure_optimizers() (lignes ~393-464):
+   - Crée l'optimizer normalement
+   - PUIS vérifie si self._stored_ckpt_opt_state existe
+   - SI OUI: Charge manuellement l'optimizer state en mappant par NOM de paramètre:
+     * Pour chaque paramètre de l'optimizer
+     * Trouve son nom via named_parameters()
+     * Mappe ce nom au checkpoint ID
+     * Charge exp_avg, exp_avg_sq, step depuis le checkpoint
+   - Charge aussi les LRs depuis checkpoint
+   - Charge le scheduler state
+   - Clear self._stored_ckpt_opt_state
+
+CODE CLÉ (configure_optimizers):
+```python
+if hasattr(self, '_stored_ckpt_opt_state') and self._stored_ckpt_opt_state is not None:
+    # Pour chaque param de l'optimizer
+    for param in param_group['params']:
+        # Trouver le nom du paramètre
+        param_name = find_name(param)
+        # Mapper nom → checkpoint ID
+        ckpt_id = id_to_name[param_name]
+        # Charger l'état
+        opt.state[param] = ckpt_state[ckpt_id]
+```
+
+================================================================================
+JOB EN COURS: 13787155
+================================================================================
+
+Status: PENDING (Priority) - attend 50 nodes
+Script de monitoring: ./WATCH_13787155.sh
+
+QUOI VÉRIFIER quand le job démarre:
+
+1. Chercher "LOADING OPTIMIZER STATE IN configure_optimizers":
+   grep "LOADING OPTIMIZER STATE IN configure_optimizers" logs/ELEVATION_MASK_13787155.out
+
+2. Vérifier que 91/91 optimizer states sont chargés:
+   grep "Loaded.*optimizer states" logs/ELEVATION_MASK_13787155.out
+
+3. Vérifier les LRs restaurées:
+   grep "Restoring LRs from checkpoint" logs/ELEVATION_MASK_13787155.out -A 5
+
+4. LE TEST CRUCIAL - train_loss au premier step:
+   grep -oP "train_loss=[\d\.]+" logs/ELEVATION_MASK_13787155.out | head -5
+
+   SUCCÈS si train_loss < 1.0 (idéalement ~0.7)
+   ÉCHEC si train_loss > 3.0
+
+================================================================================
+COMMANDES UTILES
+================================================================================
+
+# Check job status
+squeue -j 13787155
+
+# Monitor job
+./WATCH_13787155.sh
+
+# Check optimizer loading
+grep -A 10 "LOADING OPTIMIZER STATE IN configure_optimizers" logs/ELEVATION_MASK_13787155.out
+
+# Check train_loss
+grep "train_loss=" logs/ELEVATION_MASK_13787155.out | head -20
+
+# Check errors
+tail -100 logs/ELEVATION_MASK_13787155.err
+
+================================================================================
+SI ÇA NE MARCHE PAS
+================================================================================
+
+Si train_loss > 3.0 encore:
+
+HYPOTHÈSES:
+1. Le chargement manuel arrive encore trop tard
+2. Lightning écrase notre chargement manuel après
+3. Il y a un problème plus profond (data normalization, etc.)
+
+TESTS À FAIRE:
+1. Vérifier que model weights sont bien chargés:
+   - Faire une validation → val_loss devrait être ~0.35-0.40
+   - Si val_loss haute aussi → problem avec model weights!
+
+2. Vérifier l'ordre d'appel:
+   - Ajouter des prints détaillés dans configure_optimizers
+   - Vérifier que notre chargement se fait AVANT le premier step
+
+3. Tester avec moins de nodes (8 nodes = 64 GPUs) pour debug plus rapide
+
+================================================================================
+FICHIERS MODIFIÉS
+================================================================================
+
+1. src/model_multipollutants.py
+   - configure_optimizers(): Ajout chargement manuel optimizer state
+   - on_load_checkpoint(): Stockage checkpoint state
+
+2. configs/config_all_pollutants.yaml
+   - learning_rate: 0.0001 (match checkpoint)
+   - accumulate_grad_batches: 2 (match checkpoint)
+   - epochs: 10 (match checkpoint T_max)
+   - num_nodes: 50 (match checkpoint)
+
+3. src/climax_core/arch.py
+   - head: Sequential 3-layer (match checkpoint)
+
+================================================================================
+CONTACT
+================================================================================
+
+Si besoin d'aide, le résumé complet de toute la session est dans le 
+message initial de cette conversation.
+
+Checkpoint original:
+  /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt
+
+Log ancien training (pour référence):
+  /scratch/project_462000640/ammar/aq_net2/logs/aq_net2_multipoll_from_scratch_13117313.out
+
+================================================================================

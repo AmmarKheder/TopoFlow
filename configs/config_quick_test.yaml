@@ -1,0 +1,125 @@
+# Quick test config - just a few steps to check train/val loss
+# Based on config_all_pollutants.yaml but with minimal steps
+
+train:
+  batch_size: 2
+  accumulate_grad_batches: 2
+  val_batch_size: 2
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  devices: 1  # Just 1 GPU
+  num_nodes: 1  # Just 1 node
+  accelerator: gpu
+  strategy: auto
+  find_unused_parameters: true
+  precision: 32
+  gradient_clip_val: 1.0
+  log_every_n_steps: 1  # Log every step
+  val_check_interval: 5  # Validate after 5 steps
+  max_steps: 10  # Just 10 steps to test
+  epochs: 1
+  warmup_steps: 2000
+  scheduler: cosine
+  cosine_max_steps: 20000
+
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 10
+    mode: min
+  model_checkpoint:
+    monitor: val_loss
+    mode: min
+    save_top_k: 1
+    filename: test-val_loss_{val_loss:.4f}-step_{step}
+    save_last: false
+
+data:
+  data_path: ./data_processed/
+  grid_source: ./data_processed/data_2013_china_masked.zarr
+  train_years:
+  - 2013
+  val_years:
+  - 2017
+  test_years:
+  - 2018
+  variables:
+  - u
+  - v
+  - temp
+  - rh
+  - psfc
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  - lat2d
+  - lon2d
+  - pm25
+  - elevation
+  - population
+  target_variables:
+  - pm25
+  - pm10
+  - so2
+  - no2
+  - co
+  - o3
+  coordinate_variables:
+  - lat2d
+  - lon2d
+  static_variables:
+  - elevation
+  - population
+  time_step: 1
+  forecast_hours:
+  - 12
+  - 24
+  - 48
+  - 96
+  normalize: true
+  target_resolution:
+  - 128
+  - 256
+  num_workers: 4
+  consolidated: true
+  prefetch_factor: 2
+
+model:
+  img_size:
+  - 128
+  - 256
+  patch_size: 2
+  embed_dim: 768
+  depth: 6
+  decoder_depth: 2
+  num_heads: 8
+  mlp_ratio: 4
+  drop_path: 0.1
+  drop_rate: 0.1
+  parallel_patch_embed: true
+
+  # TopoFlow: Elevation-based attention mask in block 0
+  use_physics_mask: true
+
+  # Disable other physics innovations
+  use_pollutant_cross_attn: false
+  use_hierarchical_physics: false
+  use_adaptive_wind_memory: false
+
+  # Load from wind checkpoint
+  checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_144/checkpoints/best-val_loss_val_loss=0.2931-step_step=408.ckpt
+
+system:
+  miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
+
+lightning:
+  logger:
+    name: QuickTest_TopoFlow_Block0
+    project: topoflow_test
+  trainer:
+    default_root_dir: ./lightning_logs
+    enable_checkpointing: true
+    enable_model_summary: true
+    log_every_n_steps: 1
