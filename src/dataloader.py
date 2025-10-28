@@ -75,6 +75,7 @@ class PM25AirQualityDataset(Dataset):
         current_offset = 0
         
         for year in self.years:
+            # Use china_masked.zarr files (contain elevation and population variables)
             zarr_path = self.data_path / f"data_{year}_china_masked.zarr"
             if zarr_path.exists():
                 print(f"   # # # #  Loading {zarr_path}")
@@ -155,17 +156,12 @@ class PM25AirQualityDataset(Dataset):
         print(f"   # # # #  Prepared {len(self.valid_indices)} valid samples")
 
     def _normalize(self, data, var_name):
-        """Normalisation avec NORM_STATS priorisées (optimisé)"""
+        """Normalisation Z-score simplifiée (comme checkpoint 0.3557)"""
         if not self.normalize:
             return data
-        
-        # # # # #  Utiliser stats hardcodées si disponibles (plus rapide)
-        if var_name in NORM_STATS:
-            mean, std = NORM_STATS[var_name]
-            return (data - mean) / (std + 1e-8)
-        
-        # # # # #  Fallback: calcul dynamique (pour variables non-standard)
+
         if var_name not in self.stats:
+            # Calculer stats à la volée (pour éviter le stockage)
             finite_data = data[np.isfinite(data)]
             if len(finite_data) > 0:
                 self.stats[var_name] = {
@@ -174,7 +170,7 @@ class PM25AirQualityDataset(Dataset):
                 }
             else:
                 self.stats[var_name] = {'mean': 0.0, 'std': 1.0}
-        
+
         mean, std = self.stats[var_name]['mean'], self.stats[var_name]['std']
         return (data - mean) / std
 

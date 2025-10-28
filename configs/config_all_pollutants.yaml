@@ -10,12 +10,12 @@
 #
 train:
   batch_size: 2
-  accumulate_grad_batches: 4
+  accumulate_grad_batches: 2  # CRITICAL: Must match checkpoint version_47 for proper resume!
   val_batch_size: 2
-  learning_rate: 0.000150
+  learning_rate: 0.0001  # CRITICAL: Must match checkpoint version_47 base_lr for proper resume!
   weight_decay: 0.01
   devices: 8
-  num_nodes: 32  # Reduced from 50 to 32 (256 GPUs) for stability
+  num_nodes: 32  # Reduced from 50 to avoid segfaults on 400 GPUs
   accelerator: gpu
   strategy: ddp
   find_unused_parameters: true  # Required for TopoFlow elevation mask (now properly used in DDPStrategy)
@@ -23,8 +23,8 @@ train:
   gradient_clip_val: 1.0
   log_every_n_steps: 25
   val_check_interval: 25
-  max_steps: 20000  # Primary stopping criterion (20k steps)
-  epochs: 100  # Backup: increased to avoid early stopping (steps take precedence)
+  max_steps: -1  # No max steps, resume for 1 epoch
+  epochs: 5  # Resume from epoch 3 → continue jusqu'à epoch 5
   warmup_steps: 2000
   scheduler: cosine
   cosine_max_steps: 20000
@@ -108,21 +108,22 @@ model:
   parallel_patch_embed: true
 
   # TopoFlow: Elevation-based attention mask
-  use_physics_mask: true
+  # DISABLED for wind scanning only test
+  use_physics_mask: false
 
   # Disable other physics innovations (not used)
   use_pollutant_cross_attn: false
   use_hierarchical_physics: false
   use_adaptive_wind_memory: false
 
-  # Fine-tune from baseline checkpoint (original - architecture matches current code)
+  # Resume training from checkpoint 0.35 (wind scanning)
   checkpoint_path: /scratch/project_462000640/ammar/aq_net2/logs/multipollutants_climax_ddp/version_47/checkpoints/best-val_loss_val_loss=0.3557-step_step=311.ckpt
 system:
   miopen_cache_dir: /scratch/project_462000640/ammar/miopen_cache
 lightning:
   logger:
-    name: TopoFlow_FULL_WindScanning_ElevationMask_20k_steps
-    project: topoflow_full_evaluation
+    name: RESUME_WindScanning_from_0.35
+    project: topoflow_comparison
   trainer:
     default_root_dir: ./lightning_logs
     enable_checkpointing: true

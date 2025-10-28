@@ -14,8 +14,7 @@ from src.climax_core.utils.pos_embed import (
 )
 
 from src.climax_core.parallelpatchembed_wind import ParallelVarPatchEmbedWind as ParallelVarPatchEmbed
-from src.climax_core.topoflow_attention import TopoFlowBlock, compute_patch_elevations
-from src.climax_core.relative_position_bias_3d import Attention3D, compute_patch_coords_3d
+
 
 class ClimaX(nn.Module):
     """Implements the ClimaX model as described in the paper,
@@ -49,8 +48,6 @@ class ClimaX(nn.Module):
         drop_rate=0.1,
         parallel_patch_embed=False,
         scan_order="hilbert",
-        use_physics_mask=False,
-        use_3d_learnable=False,
     ):
         super().__init__()
 
@@ -59,18 +56,14 @@ class ClimaX(nn.Module):
         self.patch_size = patch_size
         self.default_vars = default_vars
         self.parallel_patch_embed = parallel_patch_embed
-        self.use_physics_mask = use_physics_mask
-        self.use_3d_learnable = use_3d_learnable
         # variable tokenization: separate embedding layer for each input variable
         self.scan_order = scan_order
         if self.parallel_patch_embed:
             self.token_embeds = ParallelVarPatchEmbed(len(default_vars), img_size, patch_size, embed_dim)
             self.num_patches = self.token_embeds.num_patches
         else:
-            # Use all_vars length for token embeds to match variable mapping
-            all_vars = ['u', 'v', 'temp', 'rh', 'psfc', 'pm10', 'so2', 'no2', 'co', 'o3', 'lat2d', 'lon2d', 'pm25', 'elevation', 'population']
             self.token_embeds = nn.ModuleList(
-                [PatchEmbed(img_size, patch_size, 1, embed_dim) for i in range(len(all_vars))]
+                [PatchEmbed(img_size, patch_size, 1, embed_dim) for i in range(len(default_vars))]
             )
             self.num_patches = self.token_embeds[0].num_patches
 
@@ -91,65 +84,57 @@ class ClimaX(nn.Module):
         # ViT backbone
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path, depth)]  # stochastic depth decay rule
-
-        # Standard ViT blocks
-        self.blocks = nn.ModuleList([
-            Block(
-                embed_dim,
-                num_heads,
-                mlp_ratio,
-                qkv_bias=True,
-                drop_path=dpr[i],
-                norm_layer=nn.LayerNorm,
-            )
-            for i in range(depth)
-        ])
-
-        # TopoFlow: Physics-guided attention (optional)
-        if self.use_physics_mask:
-            grid_h = img_size[0] // patch_size
-            grid_w = img_size[1] // patch_size
-
-            if self.use_3d_learnable:
-                # Option: 3D Learnable MLP (Zhi-Song's approach)
-                # Replace attention in first block with Attention3D
-                self.blocks[0] = Block(
+        self.blocks = nn.ModuleList(
+            [
+                Block(
                     embed_dim,
                     num_heads,
                     mlp_ratio,
                     qkv_bias=True,
-                    drop_path=dpr[0],
+                    drop_path=dpr[i],
                     norm_layer=nn.LayerNorm,
                 )
-                # Replace attention module with 3D version
-                self.blocks[0].attn = Attention3D(
-                    dim=embed_dim,
-                    num_heads=num_heads,
-                    qkv_bias=True,
-                    attn_drop=0.,
-                    proj_drop=0.,
-                    use_3d_bias=True,
-                    rel_pos_hidden_dim=64
-                )
-                print(f"✅ 3D Learnable Bias enabled: block 0, grid {grid_h}×{grid_w}, MLP-based")
-            else:
-                # Option: Simple physics formula (TopoFlow)
-                self.blocks[0] = TopoFlowBlock(
-                    dim=embed_dim,
-                    num_heads=num_heads,
-                    mlp_ratio=mlp_ratio,
-                    qkv_bias=True,
-                    drop_path=dpr[0],
-                    norm_layer=nn.LayerNorm,
-                    use_elevation_bias=True
-                )
-                print(f"✅ TopoFlow enabled: block 0, grid {grid_h}×{grid_w}, elevation bias only")
-        
-        # Layer normalization after transformer blocks
+                for i in range(depth)
+            ]
+        )
         self.norm = nn.LayerNorm(embed_dim)
-        
-        # Decoder head
-        self.head = nn.Linear(embed_dim, len(self.default_vars) * patch_size * patch_size)
+
+        # --------------------------------------------------------------------------
+
+        # prediction head
+        self.head = nn.ModuleList()
+        for _ in range(decoder_depth):
+            self.head.append(nn.Linear(embed_dim, embed_dim))
+            self.head.append(nn.GELU())
+        self.head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2))
+        self.head = nn.Sequential(*self.head)
+
+        # --------------------------------------------------------------------------
+
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        # initialize pos_emb and var_emb
+        pos_embed = get_2d_sincos_pos_embed(
+            self.pos_embed.shape[-1],
+            int(self.img_size[0] / self.patch_size),
+            int(self.img_size[1] / self.patch_size),
+            cls_token=False,
+        )
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+
+        var_embed = get_1d_sincos_pos_embed_from_grid(self.var_embed.shape[-1], np.arange(len(self.default_vars)))
+        self.var_embed.data.copy_(torch.from_numpy(var_embed).float().unsqueeze(0))
+
+        # token embedding layer
+        if self.parallel_patch_embed:
+            for i in range(len(self.token_embeds.proj_weights)):
+                w = self.token_embeds.proj_weights[i].data
+                trunc_normal_(w.view([w.shape[0], -1]), std=0.02)
+        else:
+            for i in range(len(self.token_embeds)):
+                w = self.token_embeds[i].proj.weight.data
+                trunc_normal_(w.view([w.shape[0], -1]), std=0.02)
 
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
@@ -164,9 +149,9 @@ class ClimaX(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def create_var_embedding(self, dim):
-        # Use all variables for token embeddings to match the mapping
+        var_embed = nn.Parameter(torch.zeros(1, len(self.default_vars), dim), requires_grad=True)
+        # Create mapping for ALL input variables (not just default_vars)
         all_vars = ['u', 'v', 'temp', 'rh', 'psfc', 'pm10', 'so2', 'no2', 'co', 'o3', 'lat2d', 'lon2d', 'pm25', 'elevation', 'population']
-        var_embed = nn.Parameter(torch.zeros(1, len(all_vars), dim), requires_grad=True)
         var_map = {}
         for idx, var in enumerate(all_vars):
             var_map[var] = idx
@@ -215,7 +200,7 @@ class ClimaX(nn.Module):
         x = x.unflatten(dim=0, sizes=(b, l))  # B, L, D
         return x
 
-    def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables, x_raw=None):
+    def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
         # x: `[B, V, H, W]` shape.
 
         if isinstance(variables, list):
@@ -226,87 +211,36 @@ class ClimaX(nn.Module):
         var_ids = self.get_var_ids(variables, x.device)
 
         if self.parallel_patch_embed:
-            x_tokens = self.token_embeds(x, var_ids)  # B, V, L, D
+            x = self.token_embeds(x, var_ids)  # B, V, L, D
         else:
             for i in range(len(var_ids)):
                 id = var_ids[i]
                 embeds.append(self.token_embeds[id](x[:, i : i + 1]))
-            x_tokens = torch.stack(embeds, dim=1)  # B, V, L, D
+            x = torch.stack(embeds, dim=1)  # B, V, L, D
 
         # add variable embedding
         var_embed = self.get_var_emb(self.var_embed, variables)
-        x_tokens = x_tokens + var_embed.unsqueeze(2)  # B, V, L, D
+        x = x + var_embed.unsqueeze(2)  # B, V, L, D
 
         # variable aggregation
-        x_tokens = self.aggregate_variables(x_tokens)  # B, L, D
+        x = self.aggregate_variables(x)  # B, L, D
 
         # add pos embedding
-        x_tokens = x_tokens + self.pos_embed
+        x = x + self.pos_embed
 
         # add lead time embedding
         lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
         lead_time_emb = lead_time_emb.unsqueeze(1)
-        x_tokens = x_tokens + lead_time_emb  # B, L, D
+        x = x + lead_time_emb  # B, L, D
 
-        x_tokens = self.pos_drop(x_tokens)
+        x = self.pos_drop(x)
 
-        # Extract elevation and wind for physics-guided attention
-        elevation_patches = None
-        u_wind = None
-        v_wind = None
-        coords_3d = None
+        # apply Transformer blocks
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
 
-        if self.use_physics_mask and x_raw is not None:
-            try:
-                var_list = list(variables)
-                if 'elevation' in var_list and 'u' in var_list and 'v' in var_list:
-                    elev_idx = var_list.index('elevation')
-                    u_idx = var_list.index('u')
-                    v_idx = var_list.index('v')
-
-                    elevation_field = x_raw[:, elev_idx, :, :]  # [B, H, W]
-                    u_wind = x_raw[:, u_idx, :, :]  # [B, H, W]
-                    v_wind = x_raw[:, v_idx, :, :]  # [B, H, W]
-
-                    if self.use_3d_learnable:
-                        # Compute 3D coordinates (x, y, elevation) for 3D MLP
-                        coords_3d = compute_patch_coords_3d(
-                            elevation_field,
-                            img_size=tuple(self.img_size),
-                            patch_size=self.patch_size
-                        )  # [B, N, 3]
-                    else:
-                        # Compute patch-level elevations for simple formula
-                        elevation_patches = compute_patch_elevations(
-                            elevation_field,
-                            patch_size=self.patch_size
-                        )  # [B, N]
-            except Exception as e:
-                print(f"⚠️ Physics data extraction failed: {e}")
-                elevation_patches = None
-                u_wind = None
-                v_wind = None
-                coords_3d = None
-
-        # Apply Transformer blocks
-        for i, blk in enumerate(self.blocks):
-            if i == 0 and self.use_physics_mask:
-                if self.use_3d_learnable and coords_3d is not None:
-                    # 3D MLP approach: pass 3D coordinates to attention
-                    x_tokens = blk.attn(blk.norm1(x_tokens), coords_3d=coords_3d)
-                    x_tokens = x_tokens + blk.drop_path1(x_tokens)
-                    x_tokens = x_tokens + blk.drop_path2(blk.mlp(blk.norm2(x_tokens)))
-                elif isinstance(blk, TopoFlowBlock):
-                    # Simple formula approach
-                    x_tokens = blk(x_tokens, elevation_patches, u_wind, v_wind)
-                else:
-                    x_tokens = blk(x_tokens)
-            else:
-                # Standard blocks
-                x_tokens = blk(x_tokens)
-        x_tokens = self.norm(x_tokens)
-
-        return x_tokens
+        return x
 
     def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
         """Forward pass through the model.
@@ -320,9 +254,7 @@ class ClimaX(nn.Module):
             loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
         """
-        # Pass x_raw for physics mask computation
-        x_raw = x if self.use_physics_mask else None
-        out_transformers = self.forward_encoder(x, lead_times, variables, x_raw=x_raw)  # B, L, D
+        out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
         preds = self.head(out_transformers)  # B, L, V*p*p
 
         preds = self.unpatchify(preds)
@@ -331,10 +263,11 @@ class ClimaX(nn.Module):
 
         if metric is None:
             loss = None
+        else:
             loss = [m(preds, y, out_variables, lat) for m in metric]
 
         return loss, preds
 
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
-        _,preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
+        _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]

@@ -141,27 +141,13 @@ def main(config_path):
     ckpt_path = config['model'].get('checkpoint_path', None)
 
     if ckpt_path:
-        print(f"\n# # # #  Loading checkpoint with strict=False: {ckpt_path}")
-        print("# # # #  Reason: Block 0 attention architecture changed")
+        print(f"\n# # # #  RESUME training from checkpoint: {ckpt_path}")
+        print("# # # #  This will load: model weights + optimizer state + LR scheduler + step counter")
+        print("# # # #  Training will continue EXACTLY where it left off")
 
-        # Load checkpoint manually with strict=False
-        checkpoint = torch.load(ckpt_path, map_location='cpu')
-
-        # Load state_dict with strict=False to handle architecture changes
-        result = model.load_state_dict(checkpoint['state_dict'], strict=False)
-
-        # Show what was missing/unexpected
-        if result.missing_keys:
-            print(f"\n⚠️  Missing keys (will be randomly initialized): {len(result.missing_keys)}")
-            print(f"   First few: {result.missing_keys[:5]}")
-        if result.unexpected_keys:
-            print(f"⚠️  Unexpected keys (ignored): {len(result.unexpected_keys)}")
-            print(f"   First few: {result.unexpected_keys[:5]}")
-
-        print("✅ Checkpoint loaded successfully with partial match\n")
-
-        # Don't pass ckpt_path to trainer.fit() - we already loaded it manually
-        trainer.fit(model, data_module)
+        # RESUME: Pass ckpt_path to trainer.fit() to load everything
+        # PyTorch Lightning will handle loading model + optimizer + scheduler
+        trainer.fit(model, data_module, ckpt_path=ckpt_path)
     else:
         print("# # # #  Training from scratch (no checkpoint)")
         trainer.fit(model, data_module)

@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=topoflow_256gpus
+#SBATCH --job-name=RESUME_WindScan_0.35
 #SBATCH --nodes=32
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --partition=standard-g
 #SBATCH --account=project_462001079
-#SBATCH --output=logs/topoflow_full_finetune_%j.out
-#SBATCH --error=logs/topoflow_full_finetune_%j.err
+#SBATCH --output=logs/RESUME_WIND_%j.out
+#SBATCH --error=logs/RESUME_WIND_%j.err
 
 # Clean setup according to LUMI best practices
 module purge
@@ -37,7 +37,7 @@ export PL_DISABLE_FORK_DETECTION=1
 # 🔥 NCCL OPTIMIZATIONS TO AVOID TIMEOUTS
 # ============================================
 export NCCL_DEBUG=INFO  # Changed to INFO for better debugging
-export ROCR_VISIBLE_DEVICES=$SLURM_LOCALID
+# export ROCR_VISIBLE_DEVICES=$SLURM_LOCALID  # COMMENTED: Causes amdgpu.ids error - let SLURM handle GPU assignment
 
 # Timeout increased: 2 hours instead of 30 minutes
 export NCCL_TIMEOUT=7200
@@ -74,13 +74,16 @@ echo "NCCL_TIMEOUT: $NCCL_TIMEOUT seconds (2 hours)"
 echo "=============================================="
 
 # ============================================
+# ACTIVATE VENV (srun will propagate to all nodes)
+# ============================================
+source venv_pytorch_rocm/bin/activate
+
+# ============================================
 # TENSORBOARD LAUNCH (only on master node)
 # ============================================
 if [ "$SLURM_NODEID" == "0" ]; then
-    source venv_pytorch_rocm/bin/activate
-    
     TENSORBOARD_PORT=$((6006 + $RANDOM % 1000))
-    
+
     echo ""
     echo "=============================================="
     echo "🚀 TENSORBOARD SETUP"
@@ -88,10 +91,10 @@ if [ "$SLURM_NODEID" == "0" ]; then
     echo "📊 Starting TensorBoard on node: $MASTER_NODE"
     echo "📊 Port: $TENSORBOARD_PORT"
     echo "📊 Logdir: logs/multipollutants_climax_ddp"
-    
+
     nohup tensorboard --logdir=logs/multipollutants_climax_ddp --port=$TENSORBOARD_PORT --bind_all > tensorboard_${SLURM_JOB_ID}.log 2>&1 &
     TB_PID=$!
-    
+
     echo "=============================================="  | tee tensorboard_connection_${SLURM_JOB_ID}.txt
     echo "🔗 TENSORBOARD CONNECTION INFO"                   | tee -a tensorboard_connection_${SLURM_JOB_ID}.txt
     echo "=============================================="  | tee -a tensorboard_connection_${SLURM_JOB_ID}.txt
@@ -107,9 +110,9 @@ if [ "$SLURM_NODEID" == "0" ]; then
     echo ""                                               | tee -a tensorboard_connection_${SLURM_JOB_ID}.txt
     echo "3. Open browser: http://localhost:6006"          | tee -a tensorboard_connection_${SLURM_JOB_ID}.txt
     echo "=============================================="  | tee -a tensorboard_connection_${SLURM_JOB_ID}.txt
-    
+
     sleep 5
-    
+
     if ps -p $TB_PID > /dev/null; then
         echo "✅ TensorBoard started successfully (PID: $TB_PID)"
     else
@@ -122,17 +125,20 @@ fi
 # ============================================
 echo ""
 echo "=============================================="
-echo "🔥🚀 LAUNCHING TOPOFLOW FULL FINETUNE (256 GPUs) 🚀🔥"
+echo "🔥🚀 RESUME TRAINING FROM CHECKPOINT 0.35 - 256 GPUs 🚀🔥"
 echo "=============================================="
-echo "TopoFlow: Wind Scanning + Elevation Mask (6 pollutants: PM2.5, PM10, SO2, NO2, CO, O3)"
+echo "Wind Scanning (6 pollutants: PM2.5, PM10, SO2, NO2, CO, O3)"
 echo "Nodes: $SLURM_JOB_NODELIST"
 echo "Tasks: $SLURM_NTASKS"
 echo "GPUs per node: 8 × 32 NODES = 256 GPUs TOTAL"
-echo "Fine-tuning from: best-val_loss=0.3557-step=311 (MIGRATED)"
+echo "Checkpoint: version_47 val_loss=0.3557 step=311"
+echo "Resume for 1 more epoch to verify everything works"
+echo "Wind Scanning ONLY (no TopoFlow - testing baseline)"
 echo "=============================================="
 
 # Launch distributed training (Lightning DDP handles distribution via srun)
-srun bash -c "source venv_pytorch_rocm/bin/activate && python main_multipollutants.py --config configs/config_all_pollutants.yaml"
+# Explicitly activate venv on each node via srun bash wrapper
+srun bash -c "source /scratch/project_462000640/ammar/aq_net2/venv_pytorch_rocm/bin/activate && python /scratch/project_462000640/ammar/aq_net2/main_multipollutants.py --config /scratch/project_462000640/ammar/aq_net2/configs/config_all_pollutants.yaml"
 
 # ============================================
 # CLEANUP

@@ -50,8 +50,6 @@ class MultiPollutantModel(nn.Module):
             mlp_ratio=config["model"]["mlp_ratio"],
             scan_order=config.get("model", {}).get("scan_order", "hilbert"),
             parallel_patch_embed=config.get("model", {}).get("parallel_patch_embed", False),
-            use_physics_mask=config.get("model", {}).get("use_physics_mask", False),
-            use_3d_learnable=config.get("model", {}).get("use_3d_learnable", False),
         )
 
         # Indices des variables cibles
@@ -394,12 +392,160 @@ class MultiPollutantLightningModule(pl.LightningModule):
             param_groups,
             weight_decay=self.config["train"]["weight_decay"]
         )
-        
+
         sch = torch.optim.lr_scheduler.CosineAnnealingLR(
             opt, T_max=self.config["train"]["epochs"], eta_min=1e-6
         )
-        
+
+        # CRITICAL: Load optimizer state manually if we have stored it from checkpoint
+        if hasattr(self, '_stored_ckpt_opt_state') and self._stored_ckpt_opt_state is not None:
+            print("\n" + "="*100)
+            print("# # # #  LOADING OPTIMIZER STATE IN configure_optimizers()")
+            print("="*100)
+
+            try:
+                id_to_name = self._stored_ckpt_opt_state['id_to_name']
+                ckpt_state = self._stored_ckpt_opt_state['ckpt_state']
+                ckpt_param_groups = self._stored_ckpt_opt_state['ckpt_param_groups']
+
+                # Load optimizer states by parameter name
+                loaded_count = 0
+                for param_group in opt.param_groups:
+                    for param in param_group['params']:
+                        # Find param name
+                        param_name = None
+                        for name, p in self.named_parameters():
+                            if p is param:
+                                param_name = name
+                                break
+
+                        if param_name:
+                            # Find checkpoint ID for this name
+                            ckpt_id = None
+                            for cid, pname in id_to_name.items():
+                                if pname == param_name:
+                                    ckpt_id = cid
+                                    break
+
+                            if ckpt_id is not None and ckpt_id in ckpt_state:
+                                opt.state[param] = {
+                                    'step': ckpt_state[ckpt_id]['step'].clone(),
+                                    'exp_avg': ckpt_state[ckpt_id]['exp_avg'].clone(),
+                                    'exp_avg_sq': ckpt_state[ckpt_id]['exp_avg_sq'].clone()
+                                }
+                                loaded_count += 1
+
+                print(f"# # # #  ✅ Loaded {loaded_count}/{len(ckpt_state)} optimizer states")
+
+                # Restore LRs
+                if len(opt.param_groups) == len(ckpt_param_groups):
+                    print(f"# # # #  Restoring LRs from checkpoint:")
+                    for i, (pg, ckpt_pg) in enumerate(zip(opt.param_groups, ckpt_param_groups)):
+                        pg['lr'] = ckpt_pg['lr']
+                        print(f"    Group {i}: lr={ckpt_pg['lr']:.6e}")
+
+                # Restore scheduler state
+                if 'sch_state' in self._stored_ckpt_opt_state:
+                    sch.load_state_dict(self._stored_ckpt_opt_state['sch_state'])
+                    print(f"# # # #  ✅ Scheduler restored: last_epoch={sch.last_epoch}")
+
+                print("="*100 + "\n")
+
+                # Clear stored state
+                self._stored_ckpt_opt_state = None
+
+            except Exception as e:
+                print(f"# # # #  ❌ ERROR loading optimizer state: {e}")
+                import traceback
+                traceback.print_exc()
+
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sch, "interval": "epoch"}}
+
+    def on_load_checkpoint(self, checkpoint):
+        """
+        Hook appelé par PyTorch Lightning quand un checkpoint est chargé.
+        CRITICAL: Manually load optimizer state using parameter name mapping
+        because PyTorch Lightning fails silently in DDP multi-node with param ID mismatch.
+        """
+        print("\n" + "="*100)
+        print("# # # #  on_load_checkpoint HOOK - MANUAL OPTIMIZER LOADING")
+        print("="*100)
+
+        # Log checkpoint info
+        if 'epoch' in checkpoint:
+            print(f"# # # #  Loading checkpoint from epoch {checkpoint['epoch']}, step {checkpoint.get('global_step', 'N/A')}")
+
+        # Check if optimizer states exist
+        if 'optimizer_states' not in checkpoint or len(checkpoint['optimizer_states']) == 0:
+            print(f"# # # #  WARNING: No optimizer_states found in checkpoint!")
+            self._manual_optimizer_state = None
+            return
+
+        opt_state = checkpoint['optimizer_states'][0]
+        print(f"# # # #  Optimizer state found: {len(opt_state.get('param_groups', []))} param groups")
+
+        # Log LRs from checkpoint
+        if 'param_groups' in opt_state:
+            print(f"# # # #  Checkpoint optimizer LRs:")
+            for i, pg in enumerate(opt_state['param_groups']):
+                lr = pg.get('lr', 'N/A')
+                num_params = len(pg.get('params', []))
+                print(f"    Group {i}: lr={lr:.6e}, {num_params} params")
+
+        # CRITICAL: Create parameter name → parameter object mapping
+        print(f"\n# # # #  Creating parameter name mapping...")
+        name_to_param = {}
+        param_to_name = {}
+        for name, param in self.named_parameters():
+            name_to_param[name] = param
+            param_to_name[id(param)] = name
+
+        print(f"# # # #  Total parameters: {len(name_to_param)}")
+
+        # Create ID → name mapping from checkpoint state_dict
+        # CRITICAL FIX: Map optimizer param IDs using self.named_parameters() order
+        # NOT alphabetical order! PyTorch optimizer uses the order from self.parameters()
+        print(f"\n# # # #  Mapping checkpoint param IDs to names using creation order...")
+
+        id_to_name = {}
+        param_idx = 0
+        for name, param in self.named_parameters():
+            if param.requires_grad and 'model.climax' in name:
+                if param_idx < len(opt_state.get('state', {})):
+                    id_to_name[param_idx] = name
+                    param_idx += 1
+
+        print(f"# # # #  Mapped {len(id_to_name)} param IDs to names (creation order)")
+
+        # CRITICAL FIX: Store checkpoint optimizer state for manual loading later
+        # We CANNOT remap IDs here because PyTorch uses actual Python object IDs, not indices
+        # Instead, we'll load manually after optimizer is created
+        print(f"\n# # # #  Storing checkpoint optimizer state for manual loading...")
+
+        # Store the checkpoint optimizer state (with original IDs)
+        self._stored_ckpt_opt_state = {
+            'id_to_name': id_to_name,
+            'name_to_param': name_to_param,
+            'ckpt_state': opt_state.get('state', {}).copy(),
+            'ckpt_param_groups': opt_state.get('param_groups', [])
+        }
+
+        # Also store LR scheduler state
+        if 'lr_schedulers' in checkpoint and len(checkpoint['lr_schedulers']) > 0:
+            sch_state = checkpoint['lr_schedulers'][0]
+            self._stored_ckpt_opt_state['sch_state'] = sch_state
+            print(f"\n# # # #  LR Scheduler state found:")
+            print(f"    last_epoch: {sch_state.get('last_epoch', 'N/A')}")
+            print(f"    base_lrs: {sch_state.get('base_lrs', 'N/A')}")
+            print(f"    _last_lr: {sch_state.get('_last_lr', 'N/A')}")
+
+        # NOTE: We do NOT clear checkpoint['optimizer_states'] here
+        # Lightning will try to load it (and fail silently in DDP), but that's OK
+        # We'll load it manually in configure_optimizers() with correct parameter name mapping
+        print(f"# # # #  ✅ Will load optimizer/scheduler manually in configure_optimizers() with name mapping")
+
+        print("="*100 + "\n")
+
 
 
     # ----------------- TEST -----------------
