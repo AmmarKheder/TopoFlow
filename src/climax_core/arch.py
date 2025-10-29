@@ -14,7 +14,7 @@ from src.climax_core.utils.pos_embed import (
 )
 
 from src.climax_core.parallelpatchembed_wind import ParallelVarPatchEmbedWind as ParallelVarPatchEmbed
-from src.climax_core.topoflow import PhysicsGuidedBlock, compute_patch_elevations
+from src.climax_core.topoflow_v2 import TopoFlowBlockV2, compute_patch_elevations, compute_patch_coords_2d
 
 
 class ClimaX(nn.Module):
@@ -88,13 +88,13 @@ class ClimaX(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path, depth)]  # stochastic depth decay rule
 
-        # Build blocks: Block 0 with TopoFlow if enabled, rest with standard attention
+        # Build blocks: Block 0 with TopoFlow V2 if enabled, rest with standard attention
         self.blocks = nn.ModuleList()
         for i in range(depth):
             if i == 0 and self.use_physics_mask:
-                # Block 0: Physics-guided attention with elevation bias
+                # Block 0: TopoFlow V2 with alpha elevation (relative position disabled for memory)
                 self.blocks.append(
-                    PhysicsGuidedBlock(
+                    TopoFlowBlockV2(
                         dim=embed_dim,
                         num_heads=num_heads,
                         mlp_ratio=mlp_ratio,
@@ -103,6 +103,8 @@ class ClimaX(nn.Module):
                         attn_drop=drop_rate,
                         drop_path=dpr[i],
                         norm_layer=nn.LayerNorm,
+                        elevation_scale=1000.0,
+                        rel_pos_hidden_dim=64,
                     )
                 )
             else:
@@ -263,16 +265,27 @@ class ClimaX(nn.Module):
 
         x = self.pos_drop(x)
 
-        # Compute patch-level elevations if physics mask enabled
+        # Compute spatial coordinates and elevations if physics mask enabled
+        coords_2d = None
         elevation_patches = None
-        if self.use_physics_mask and elevation_field is not None:
-            elevation_patches = compute_patch_elevations(elevation_field, self.patch_size)  # [B, N]
+        if self.use_physics_mask:
+            # Compute 2D spatial coordinates (x, y) for relative positional bias
+            coords_2d = compute_patch_coords_2d(
+                img_size=self.img_size,
+                patch_size=self.patch_size,
+                device=x.device
+            )  # [1, N, 2]
+            coords_2d = coords_2d.expand(x.shape[0], -1, -1)  # [B, N, 2]
+
+            # Compute elevation patches for alpha elevation mask
+            if elevation_field is not None:
+                elevation_patches = compute_patch_elevations(elevation_field, self.patch_size)  # [B, N]
 
         # apply Transformer blocks
         for i, blk in enumerate(self.blocks):
-            if i == 0 and self.use_physics_mask and elevation_patches is not None:
-                # Block 0 with elevation bias
-                x = blk(x, elevation_patches)
+            if i == 0 and self.use_physics_mask and coords_2d is not None and elevation_patches is not None:
+                # Block 0: TopoFlow V2 with coords_2d + elevation
+                x = blk(x, coords_2d, elevation_patches)
             else:
                 # Standard blocks
                 x = blk(x)

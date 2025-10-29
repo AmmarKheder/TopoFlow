@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=TopoFlow_Block0_FineTune
-#SBATCH --nodes=16
+#SBATCH --nodes=64
 #SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
-#SBATCH --time=24:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=standard-g
-#SBATCH --account=project_462001079
+#SBATCH --account=project_462001080
 #SBATCH --output=logs/TOPOFLOW_BLOCK0_%j.out
 #SBATCH --error=logs/TOPOFLOW_BLOCK0_%j.err
 
@@ -125,13 +125,13 @@ fi
 # ============================================
 echo ""
 echo "=============================================="
-echo "🔥🚀 TOPOFLOW BLOCK 0 FINE-TUNING - 128 GPUs 🚀🔥"
+echo "🔥🚀 TOPOFLOW BLOCK 0 FINE-TUNING - 512 GPUs 🚀🔥"
 echo "=============================================="
 echo "TopoFlow: Wind Scanning + Elevation Bias (Block 0 only)"
 echo "6 pollutants: PM2.5, PM10, SO2, NO2, CO, O3"
 echo "Nodes: $SLURM_JOB_NODELIST"
 echo "Tasks: $SLURM_NTASKS"
-echo "GPUs per node: 8 × 16 NODES = 128 GPUs TOTAL"
+echo "GPUs per node: 8 × 64 NODES = 512 GPUs TOTAL"
 echo "Checkpoint: version_144 val_loss=0.2931 step=408"
 echo "Fine-tuning with elevation-based attention in block 0"
 echo "=============================================="

@@ -9,25 +9,25 @@
 # - Test automatique à la fin sur 2018 (même GPUs)
 #
 train:
-  batch_size: 2
-  accumulate_grad_batches: 2  # CRITICAL: Must match checkpoint version_47 for proper resume!
-  val_batch_size: 2
+  batch_size: 2  # Keep at 2 for stable convergence (effective batch = 2×2×1024 = 4096)
+  accumulate_grad_batches: 2  # Keep at 2 for stability
+  val_batch_size: 2  # Keep at 2 for consistency
   learning_rate: 0.0001  # CRITICAL: Must match checkpoint version_47 base_lr for proper resume!
   weight_decay: 0.01
   devices: 8
-  num_nodes: 16  # Reduced from 32 to 16 for faster RCCL initialization (128 GPUs)
+  num_nodes: 64  # Reduced to 64 nodes (512 GPUs) for stability
   accelerator: gpu
   strategy: ddp
   find_unused_parameters: true  # Required for TopoFlow elevation mask (now properly used in DDPStrategy)
   precision: 32
   gradient_clip_val: 1.0
-  log_every_n_steps: 25
-  val_check_interval: 25
+  log_every_n_steps: 6  # Logs every 6 steps for 64 nodes (135 steps/epoch)
+  val_check_interval: 27  # Validation every 27 steps (~5 validations per epoch)
   max_steps: -1  # No max steps, resume for 1 epoch
   epochs: 5  # Resume from epoch 3 → continue jusqu'à epoch 5
-  warmup_steps: 2000
+  warmup_steps: 67  # Warmup for ~1/2 epoch with 64 nodes (135 steps/epoch)
   scheduler: cosine
-  cosine_max_steps: 20000
+  cosine_max_steps: 675  # 5 epochs × 135 steps = 675 total steps with 64 nodes
 callbacks:
   early_stopping:
     monitor: val_loss
