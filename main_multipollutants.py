@@ -141,13 +141,29 @@ def main(config_path):
     ckpt_path = config['model'].get('checkpoint_path', None)
 
     if ckpt_path:
-        print(f"\n# # # #  RESUME training from checkpoint: {ckpt_path}")
-        print("# # # #  This will load: model weights + optimizer state + LR scheduler + step counter")
-        print("# # # #  Training will continue EXACTLY where it left off")
+        print(f"\n# # # #  Loading model weights from checkpoint: {ckpt_path}")
 
-        # RESUME: Pass ckpt_path to trainer.fit() to load everything
-        # PyTorch Lightning will handle loading model + optimizer + scheduler
-        trainer.fit(model, data_module, ckpt_path=ckpt_path)
+        # Load checkpoint
+        checkpoint = torch.load(ckpt_path, map_location='cpu')
+
+        # Check if this is a weights-only checkpoint
+        if 'optimizer_states' not in checkpoint:
+            print("# # # #  WEIGHTS-ONLY checkpoint detected")
+            print("# # # #  Loading: model weights ONLY")
+            print("# # # #  Optimizer will start fresh (good for fine-tuning!)")
+
+            # Load model weights with strict=False to handle minor structure changes
+            model.load_state_dict(checkpoint['state_dict'], strict=False)
+
+            # Start training WITHOUT passing ckpt_path (optimizer starts fresh)
+            trainer.fit(model, data_module)
+        else:
+            print("# # # #  FULL checkpoint detected")
+            print("# # # #  Loading: model weights + optimizer state + LR scheduler + step counter")
+            print("# # # #  Training will continue EXACTLY where it left off")
+
+            # RESUME: Pass ckpt_path to trainer.fit() to load everything
+            trainer.fit(model, data_module, ckpt_path=ckpt_path)
     else:
         print("# # # #  Training from scratch (no checkpoint)")
         trainer.fit(model, data_module)
