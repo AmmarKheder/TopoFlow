@@ -11,9 +11,10 @@
             --primary-dark: #1d4ed8;
             --secondary: #7c3aed;
             --accent: #06b6d4;
-            --dark: #0f172a;
+            --dark: #1e293b;
             --gray: #64748b;
             --light: #f8fafc;
+            --white: #ffffff;
             --gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #06b6d4 100%);
         }
 
@@ -25,8 +26,8 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--dark);
-            color: #e2e8f0;
+            background: var(--white);
+            color: var(--dark);
             line-height: 1.6;
         }
 
@@ -40,10 +41,10 @@
             position: fixed;
             top: 0;
             width: 100%;
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(12px);
             z-index: 100;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid #e2e8f0;
         }
 
         nav .container {
@@ -68,14 +69,14 @@
         }
 
         .nav-links a {
-            color: #94a3b8;
+            color: var(--gray);
             text-decoration: none;
             font-weight: 500;
             transition: color 0.2s;
         }
 
         .nav-links a:hover {
-            color: white;
+            color: var(--primary);
         }
 
         .hero {
@@ -83,7 +84,7 @@
             display: flex;
             align-items: center;
             padding-top: 64px;
-            background: radial-gradient(ellipse at top, rgba(37, 99, 235, 0.15) 0%, transparent 50%);
+            background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%);
         }
 
         .hero-content {
@@ -95,11 +96,11 @@
         .badge {
             display: inline-block;
             padding: 8px 16px;
-            background: rgba(37, 99, 235, 0.2);
-            border: 1px solid rgba(37, 99, 235, 0.3);
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.2);
             border-radius: 100px;
             font-size: 0.875rem;
-            color: #60a5fa;
+            color: var(--primary);
             margin-bottom: 24px;
         }
 
@@ -108,14 +109,14 @@
             font-weight: 700;
             line-height: 1.1;
             margin-bottom: 24px;
-            background: linear-gradient(to right, #fff 0%, #94a3b8 100%);
+            background: var(--gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
             font-size: 1.25rem;
-            color: #94a3b8;
+            color: var(--gray);
             max-width: 600px;
             margin: 0 auto 40px;
         }
@@ -149,17 +150,18 @@
         }
 
         .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--white);
+            color: var(--dark);
+            border: 1px solid #e2e8f0;
         }
 
         .btn-secondary:hover {
-            background: rgba(255,255,255,0.15);
+            background: var(--light);
+            border-color: var(--primary);
         }
 
         section {
-            padding: 120px 0;
+            padding: 100px 0;
         }
 
         .section-title {
@@ -167,17 +169,18 @@
             font-weight: 700;
             text-align: center;
             margin-bottom: 16px;
+            color: var(--dark);
         }
 
         .section-subtitle {
             text-align: center;
-            color: #94a3b8;
+            color: var(--gray);
             max-width: 600px;
             margin: 0 auto 64px;
         }
 
         .features {
-            background: linear-gradient(180deg, transparent 0%, rgba(37, 99, 235, 0.05) 50%, transparent 100%);
+            background: var(--light);
         }
 
         .features-grid {
@@ -187,17 +190,17 @@
         }
 
         .feature-card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--white);
+            border: 1px solid #e2e8f0;
             border-radius: 16px;
             padding: 32px;
             transition: all 0.3s;
         }
 
         .feature-card:hover {
-            background: rgba(255,255,255,0.05);
-            border-color: rgba(37, 99, 235, 0.5);
+            border-color: var(--primary);
             transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
         }
 
         .feature-icon {
@@ -215,53 +218,31 @@
         .feature-card h3 {
             font-size: 1.25rem;
             margin-bottom: 12px;
+            color: var(--dark);
         }
 
         .feature-card p {
-            color: #94a3b8;
+            color: var(--gray);
             font-size: 0.95rem;
         }
 
         .architecture {
-            background: var(--dark);
+            background: var(--white);
         }
 
-        .arch-diagram {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
+        .arch-image {
+            max-width: 100%;
             border-radius: 16px;
-            padding: 48px;
-            max-width: 800px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
             margin: 0 auto;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            line-height: 1.8;
-            overflow-x: auto;
+            display: block;
         }
 
-        .arch-block {
-            background: rgba(37, 99, 235, 0.1);
-            border: 1px solid rgba(37, 99, 235, 0.3);
-            border-radius: 8px;
-            padding: 16px 24px;
-            margin: 16px 0;
+        .arch-caption {
             text-align: center;
-        }
-
-        .arch-block.accent {
-            background: rgba(124, 58, 237, 0.1);
-            border-color: rgba(124, 58, 237, 0.3);
-        }
-
-        .arch-block.highlight {
-            background: rgba(6, 182, 212, 0.1);
-            border-color: rgba(6, 182, 212, 0.3);
-        }
-
-        .arch-arrow {
-            text-align: center;
-            color: #64748b;
-            font-size: 1.5rem;
+            color: var(--gray);
+            margin-top: 24px;
+            font-size: 0.9rem;
         }
 
         .stats {
@@ -284,25 +265,25 @@
         }
 
         .stat-label {
-            color: #94a3b8;
+            color: var(--gray);
             margin-top: 8px;
         }
 
         .code-section {
-            background: linear-gradient(180deg, rgba(124, 58, 237, 0.05) 0%, transparent 100%);
+            background: var(--light);
         }
 
         .code-block {
-            background: #0d1117;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #1e293b;
             border-radius: 12px;
             overflow: hidden;
             max-width: 700px;
             margin: 0 auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
         }
 
         .code-header {
-            background: rgba(255,255,255,0.05);
+            background: #334155;
             padding: 12px 20px;
             display: flex;
             gap: 8px;
@@ -324,6 +305,7 @@
             font-size: 0.9rem;
             line-height: 1.7;
             overflow-x: auto;
+            color: #e2e8f0;
         }
 
         .code-content .comment { color: #6e7681; }
@@ -332,19 +314,20 @@
         .code-content .function { color: #d2a8ff; }
 
         footer {
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid #e2e8f0;
             padding: 48px 0;
             text-align: center;
-            color: #64748b;
+            color: var(--gray);
+            background: var(--white);
         }
 
         footer a {
-            color: #94a3b8;
+            color: var(--primary);
             text-decoration: none;
         }
 
         footer a:hover {
-            color: white;
+            text-decoration: underline;
         }
 
         @media (max-width: 768px) {
@@ -370,7 +353,7 @@
     <section class="hero">
         <div class="container">
             <div class="hero-content">
-                <div class="badge">🌍 Physics-Informed Deep Learning</div>
+                <div class="badge">Physics-Informed Deep Learning</div>
                 <h1>TopoFlow</h1>
                 <p class="subtitle">
                     A Vision Transformer model for multi-pollutant air quality forecasting
@@ -387,11 +370,25 @@
         </div>
     </section>
 
+    <section class="architecture" id="architecture">
+        <div class="container">
+            <h2 class="section-title">Architecture</h2>
+            <p class="section-subtitle">
+                TopoFlow extends the Vision Transformer with physics-informed components for atmospheric modeling.
+            </p>
+            <img src="assets/architecture.png" alt="TopoFlow Architecture" class="arch-image">
+            <p class="arch-caption">
+                TopoFlow architecture: Wind-guided patch shuffling with sector-based estimation,
+                elevation-aware attention bias, and multi-pollutant prediction heads.
+            </p>
+        </div>
+    </section>
+
     <section class="features" id="features">
         <div class="container">
             <h2 class="section-title">Key Innovations</h2>
             <p class="section-subtitle">
-                TopoFlow introduces physics-informed inductive biases into the Vision Transformer architecture for atmospheric modeling.
+                Physics-informed inductive biases for atmospheric transport modeling.
             </p>
             <div class="features-grid">
                 <div class="feature-card">
@@ -402,7 +399,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">⛰️</div>
                     <h3>Elevation-Aware Modeling</h3>
-                    <p>Learnable topographic barrier modeling penalizes attention across elevation gradients, capturing mountain blocking effects.</p>
+                    <p>Learnable α parameter modulates attention based on terrain elevation differences, capturing mountain blocking effects.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">🎯</div>
@@ -447,41 +444,6 @@
         </div>
     </section>
 
-    <section class="architecture" id="architecture">
-        <div class="container">
-            <h2 class="section-title">Architecture</h2>
-            <p class="section-subtitle">
-                TopoFlow extends the Vision Transformer with physics-informed components in the first attention block.
-            </p>
-            <div class="arch-diagram">
-                <div class="arch-block">
-                    <strong>Input</strong><br>
-                    [B, 15, 128, 256] — 15 variables (meteo + pollutants + terrain)
-                </div>
-                <div class="arch-arrow">↓</div>
-                <div class="arch-block accent">
-                    <strong>Wind-Guided Patch Embedding</strong><br>
-                    Variable tokenization + wind-following reordering
-                </div>
-                <div class="arch-arrow">↓</div>
-                <div class="arch-block highlight">
-                    <strong>TopoFlow Block</strong> (Block 0)<br>
-                    Relative 2D position bias + α elevation mask
-                </div>
-                <div class="arch-arrow">↓</div>
-                <div class="arch-block">
-                    <strong>Standard ViT Blocks</strong> (Blocks 1-5)<br>
-                    Multi-head self-attention + MLP
-                </div>
-                <div class="arch-arrow">↓</div>
-                <div class="arch-block">
-                    <strong>Decoder Head</strong><br>
-                    [B, 6, 128, 256] — 6 pollutants output
-                </div>
-            </div>
-        </div>
-    </section>
-
     <section class="code-section" id="quickstart">
         <div class="container">
             <h2 class="section-title">Quick Start</h2>
@@ -517,7 +479,7 @@ predictions = model(x, lead_times, variables)
 
     <footer>
         <div class="container">
-            <p>TopoFlow — MIT License — <a href="https://github.com/AmmarKheder/TopoFlow">GitHub</a></p>
+            <p><strong>TopoFlow</strong> — MIT License — <a href="https://github.com/AmmarKheder/TopoFlow">GitHub</a></p>
             <p style="margin-top: 8px;">Created by Ammar Kheder</p>
         </div>
     </footer>
