@@ -57,9 +57,23 @@
         .logo {
             font-size: 1.5rem;
             font-weight: 700;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
             background: var(--gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
         }
 
         .nav-links {
@@ -109,9 +123,7 @@
             font-weight: 700;
             line-height: 1.1;
             margin-bottom: 24px;
-            background: var(--gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--dark);
         }
 
         .subtitle {
@@ -340,7 +352,7 @@
 <body>
     <nav>
         <div class="container">
-            <div class="logo">TopoFlow</div>
+            <div class="logo"><span class="logo-icon">T</span>TopoFlow</div>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
                 <li><a href="#architecture">Architecture</a></li>
