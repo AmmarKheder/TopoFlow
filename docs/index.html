@@ -60,20 +60,19 @@
             color: var(--dark);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            text-decoration: none;
         }
 
         .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--gradient);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 1rem;
+            width: 36px;
+            height: 36px;
+            position: relative;
+        }
+
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
         }
 
         .nav-links {
@@ -323,7 +322,7 @@
         .code-content .comment { color: #6e7681; }
         .code-content .keyword { color: #ff7b72; }
         .code-content .string { color: #a5d6ff; }
-        .code-content .function { color: #d2a8ff; }
+        .code-content .function { color: #60a5fa; }
 
         footer {
             border-top: 1px solid #e2e8f0;
@@ -352,7 +351,23 @@
 <body>
     <nav>
         <div class="container">
-            <div class="logo"><span class="logo-icon">T</span>TopoFlow</div>
+            <a href="#" class="logo">
+                <span class="logo-icon">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="8" fill="url(#logoGrad)"/>
+                        <path d="M10 25 Q15 20, 20 22 T30 18" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                        <path d="M10 20 Q15 15, 20 17 T30 13" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+                        <path d="M10 30 Q15 25, 20 27 T30 23" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.5"/>
+                        <defs>
+                            <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
+                                <stop offset="0%" stop-color="#1d4ed8"/>
+                                <stop offset="100%" stop-color="#3b82f6"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </span>
+                TopoFlow
+            </a>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
                 <li><a href="#architecture">Architecture</a></li>
