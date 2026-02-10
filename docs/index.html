@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopoFlow — Physics-Informed Air Quality Forecasting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --accent: #3b82f6;
+            --accent-light: #dbeafe;
+            --dark: #0f172a;
+            --dark2: #1e293b;
+            --gray: #64748b;
+            --gray-light: #94a3b8;
+            --light: #f8fafc;
+            --white: #ffffff;
+            --border: #e2e8f0;
+            --gradient: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+            --gradient-dark: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+            --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+            --shadow-xl: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--white);
+            color: var(--dark);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        .container-wide { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+
+        /* ── Navigation ── */
+        nav {
+            position: fixed; top: 0; width: 100%;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        nav .container {
+            display: flex; justify-content: space-between; align-items: center; height: 64px;
+        }
+
+        .logo {
+            font-size: 1.4rem; font-weight: 700; color: var(--dark);
+            display: flex; align-items: center; gap: 10px; text-decoration: none;
+        }
+
+        .logo-icon svg { width: 36px; height: 36px; }
+
+        .nav-links { display: flex; gap: 28px; list-style: none; }
+        .nav-links a {
+            color: var(--gray); text-decoration: none; font-weight: 500;
+            font-size: 0.9rem; transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* ── Hero ── */
+        .hero {
+            min-height: 100vh; display: flex; align-items: center;
+            padding-top: 64px;
+            background: linear-gradient(180deg, #eff6ff 0%, #ffffff 60%);
+            position: relative; overflow: hidden;
+        }
+
+        .hero::before {
+            content: ''; position: absolute; top: -50%; right: -30%;
+            width: 80%; height: 200%;
+            background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-content { text-align: center; max-width: 860px; margin: 0 auto; position: relative; }
+
+        .badge {
+            display: inline-block; padding: 6px 18px;
+            background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.15);
+            border-radius: 100px; font-size: 0.85rem; color: var(--primary);
+            font-weight: 500; margin-bottom: 24px; letter-spacing: 0.02em;
+        }
+
+        h1 {
+            font-size: 4.5rem; font-weight: 800; line-height: 1.05;
+            margin-bottom: 24px; color: var(--dark);
+            letter-spacing: -0.03em;
+        }
+
+        h1 span {
+            background: var(--gradient);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1.2rem; color: var(--gray); max-width: 620px;
+            margin: 0 auto 40px; line-height: 1.7;
+        }
+
+        .buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+        .btn {
+            padding: 14px 28px; border-radius: 10px; font-weight: 600;
+            text-decoration: none; transition: all 0.25s;
+            display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: var(--gradient); color: white;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(37,99,235,0.35);
+        }
+
+        .btn-secondary {
+            background: var(--white); color: var(--dark);
+            border: 1.5px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--primary); background: #f8faff; }
+
+        /* ── Sections ── */
+        section { padding: 100px 0; }
+
+        .section-label {
+            text-transform: uppercase; font-size: 0.8rem; font-weight: 700;
+            letter-spacing: 0.12em; color: var(--primary); text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 2.5rem; font-weight: 700; text-align: center;
+            margin-bottom: 16px; color: var(--dark); letter-spacing: -0.02em;
+        }
+
+        .section-subtitle {
+            text-align: center; color: var(--gray); max-width: 640px;
+            margin: 0 auto 64px; font-size: 1.05rem;
+        }
+
+        /* ── Abstract ── */
+        .abstract-section { background: var(--white); padding: 80px 0; }
+
+        .abstract-box {
+            max-width: 900px; margin: 0 auto;
+            background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+            border: 1px solid var(--border); border-radius: 16px;
+            padding: 48px; position: relative;
+        }
+
+        .abstract-box::before {
+            content: ''; position: absolute; left: 0; top: 24px; bottom: 24px;
+            width: 4px; background: var(--gradient); border-radius: 2px;
+        }
+
+        .abstract-box p {
+            font-size: 1.02rem; line-height: 1.85; color: var(--dark2);
+        }
+
+        .abstract-box p + p { margin-top: 16px; }
+
+        /* ── Architecture ── */
+        .architecture { background: var(--white); }
+
+        .arch-image {
+            max-width: 100%; border-radius: 16px;
+            box-shadow: var(--shadow-xl); margin: 0 auto; display: block;
+        }
+
+        .arch-caption {
+            text-align: center; color: var(--gray); margin-top: 20px; font-size: 0.9rem;
+        }
+
+        /* ── Method Details ── */
+        .method-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+        }
+
+        .method-card {
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: 16px; padding: 36px; transition: all 0.3s;
+        }
+
+        .method-card:hover {
+            border-color: var(--accent); transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .method-card h3 {
+            font-size: 1.15rem; margin-bottom: 16px; color: var(--dark);
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        .method-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: var(--gradient); display: flex; align-items: center;
+            justify-content: center; font-size: 18px; flex-shrink: 0;
+        }
+
+        .method-card p { color: var(--gray); font-size: 0.93rem; line-height: 1.7; }
+
+        .method-card .math-block {
+            background: #f1f5f9; border-radius: 8px; padding: 16px;
+            margin: 16px 0; text-align: center; font-size: 0.95rem;
+            overflow-x: auto;
+        }
+
+        /* ── Features / Stats ── */
+        .features { background: var(--light); }
+
+        .features-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: 16px; padding: 28px; transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary); transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .feature-card h3 { font-size: 1.05rem; margin-bottom: 10px; color: var(--dark); }
+        .feature-card p { color: var(--gray); font-size: 0.9rem; }
+
+        .stats {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 24px; margin-top: 80px;
+        }
+
+        .stat { text-align: center; }
+        .stat-value {
+            font-size: 2.8rem; font-weight: 800;
+            background: var(--gradient);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .stat-label { color: var(--gray); margin-top: 4px; font-size: 0.9rem; }
+
+        /* ── Results / Case Studies ── */
+        .results { background: var(--white); }
+
+        .results-grid { display: grid; grid-template-columns: 1fr; gap: 48px; }
+
+        .case-study {
+            background: var(--white); border: 1px solid var(--border);
+            border-radius: 16px; overflow: hidden; transition: all 0.3s;
+        }
+
+        .case-study:hover {
+            border-color: var(--primary); box-shadow: var(--shadow-lg);
+        }
+
+        .case-study img { width: 100%; display: block; }
+
+        .case-study-content { padding: 28px; }
+
+        .case-study-content h3 {
+            font-size: 1.2rem; margin-bottom: 8px; color: var(--dark);
+        }
+
+        .case-study-content p { color: var(--gray); font-size: 0.95rem; line-height: 1.7; }
+
+        .case-study-tag {
+            display: inline-block; padding: 4px 12px;
+            background: rgba(37,99,235,0.08); color: var(--primary);
+            border-radius: 100px; font-size: 0.75rem; font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+
+        /* ── Equations Section ── */
+        .equations { background: var(--dark); color: #e2e8f0; }
+        .equations .section-label { color: var(--accent); }
+        .equations .section-title { color: var(--white); }
+        .equations .section-subtitle { color: var(--gray-light); }
+
+        .eq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+
+        .eq-card {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; padding: 32px;
+        }
+
+        .eq-card h3 { color: var(--white); margin-bottom: 16px; font-size: 1.1rem; }
+        .eq-card p { color: var(--gray-light); font-size: 0.9rem; margin-bottom: 16px; }
+
+        .eq-card .katex-display { margin: 16px 0; }
+        .eq-card .katex { color: #e2e8f0; }
+
+        /* ── Specs Table ── */
+        .specs { background: var(--light); }
+
+        .specs-table {
+            max-width: 800px; margin: 0 auto;
+            background: var(--white); border-radius: 16px;
+            border: 1px solid var(--border); overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .specs-table table { width: 100%; border-collapse: collapse; }
+
+        .specs-table th {
+            background: var(--dark); color: var(--white);
+            padding: 14px 24px; text-align: left; font-size: 0.85rem;
+            font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+
+        .specs-table td {
+            padding: 14px 24px; border-bottom: 1px solid var(--border);
+            font-size: 0.93rem;
+        }
+
+        .specs-table tr:last-child td { border-bottom: none; }
+
+        .specs-table td:first-child { font-weight: 600; color: var(--dark); }
+        .specs-table td:last-child { color: var(--gray); }
+
+        .specs-table tr:hover td { background: #f8fafc; }
+
+        /* ── Code ── */
+        .code-section { background: var(--white); }
+
+        .code-block {
+            background: #0f172a; border-radius: 16px; overflow: hidden;
+            max-width: 720px; margin: 0 auto;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .code-header {
+            background: #1e293b; padding: 14px 20px;
+            display: flex; gap: 8px; align-items: center;
+        }
+
+        .code-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .code-dot.red { background: #ff5f57; }
+        .code-dot.yellow { background: #febc2e; }
+        .code-dot.green { background: #28c840; }
+
+        .code-title {
+            color: #94a3b8; font-size: 0.8rem; margin-left: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .code-content {
+            padding: 28px; font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem; line-height: 1.8; overflow-x: auto; color: #e2e8f0;
+        }
+
+        .code-content .comment { color: #6e7681; }
+        .code-content .keyword { color: #ff7b72; }
+        .code-content .string { color: #a5d6ff; }
+        .code-content .function { color: #79c0ff; }
+        .code-content .number { color: #f2cc60; }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--border); padding: 48px 0;
+            text-align: center; color: var(--gray); background: var(--light);
+        }
+        footer a { color: var(--primary); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        /* ── Responsive ── */
+        @media (max-width: 1024px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .method-grid { grid-template-columns: 1fr; }
+            .eq-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.8rem; }
+            .section-title { font-size: 2rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .two-col { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .nav-links { display: none; }
+        }
+
+        /* ── Pollutant selector buttons ── */
+        .pollutant-btn {
+            padding: 8px 18px; border-radius: 8px; border: 1.5px solid var(--border);
+            background: var(--white); color: var(--dark); font-weight: 600; font-size: 0.9rem;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .pollutant-btn:hover {
+            border-color: var(--primary); background: #f0f5ff; color: var(--primary);
+        }
+        .pollutant-btn.active {
+            background: var(--gradient); color: white; border-color: transparent;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+        }
+
+        /* ── Smooth scroll ── */
+        html { scroll-behavior: smooth; }
+
+        /* ── Figure caption numbering ── */
+        .fig-number { font-weight: 700; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ NAVIGATION ═══════════════════════ -->
+<nav>
+    <div class="container">
+        <a href="#" class="logo">
+            <span class="logo-icon">
+                <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="40" height="40" rx="8" fill="url(#logoGrad)"/>
+                    <path d="M10 25 Q15 20, 20 22 T30 18" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                    <path d="M10 20 Q15 15, 20 17 T30 13" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+                    <path d="M10 30 Q15 25, 20 27 T30 23" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.5"/>
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
+                            <stop offset="0%" stop-color="#1d4ed8"/>
+                            <stop offset="100%" stop-color="#3b82f6"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </span>
+            TopoFlow
+        </a>
+        <ul class="nav-links">
+            <li><a href="#abstract">Paper</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#method">Method</a></li>
+            <li><a href="#results">Results</a></li>
+            <li><a href="#specs">Specifications</a></li>
+            <li><a href="#quickstart">Code</a></li>
+            <li><a href="https://github.com/AmmarKheder/TopoFlow">GitHub</a></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- ═══════════════════════ HERO ═══════════════════════ -->
+<section class="hero">
+    <div class="container">
+        <div class="hero-content">
+            <div class="badge">Under Review &mdash; 2026</div>
+            <h1><span>TopoFlow</span></h1>
+            <p class="subtitle">
+                A physics-informed Vision Transformer for multi-pollutant air quality forecasting
+                over China, with wind-following patch reordering and topography-aware attention.
+            </p>
+            <div class="buttons">
+                <a href="https://github.com/AmmarKheder/TopoFlow" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    View on GitHub
+                </a>
+                <a href="#abstract" class="btn btn-secondary">Read the Paper</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ ABSTRACT ═══════════════════════ -->
+<section class="abstract-section" id="abstract">
+    <div class="container">
+        <p class="section-label">Abstract</p>
+        <h2 class="section-title">Paper Summary</h2>
+        <div class="abstract-box">
+            <p>
+                We propose <strong>TopoFlow</strong>, a physics-informed Vision Transformer for multi-pollutant air quality
+                forecasting over China. TopoFlow extends the ClimaX architecture with two key innovations:
+                (1) <em>wind-following patch reordering</em> that aligns the sequential processing of spatial patches
+                with atmospheric transport direction, and (2) <em>topography-aware attention bias</em> that encodes
+                elevation barriers as a learnable inductive bias in the first transformer block.
+            </p>
+            <p>
+                The model operates on a 128 &times; 256 grid at 0.25&deg; resolution covering mainland China and Taiwan,
+                jointly forecasting six pollutants (PM<sub>2.5</sub>, PM<sub>10</sub>, SO<sub>2</sub>, NO<sub>2</sub>,
+                CO, O<sub>3</sub>) at four temporal horizons (12h, 24h, 48h, 96h). Trained on the Chinese Air Quality
+                Reanalysis (CAQRA) dataset from 2013&ndash;2016, validated on 2017, and tested on 2018, TopoFlow is
+                compared against CAMS global forecasts, Microsoft Aurora, the ClimaX baseline, and independent OpenAQ
+                station measurements.
+            </p>
+            <p>
+                The learnable parameter &alpha; controls the strength of topographic resistance in the elevation bias,
+                physically encoding mountain blocking effects on pollutant transport &mdash; a phenomenon critical in
+                regions like the Sichuan Basin, Tarim Basin, and North China Plain.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ ARCHITECTURE ═══════════════════════ -->
+<section class="architecture" id="architecture">
+    <div class="container">
+        <p class="section-label">Model Design</p>
+        <h2 class="section-title">Architecture</h2>
+        <p class="section-subtitle">
+            TopoFlow extends the Vision Transformer with physics-informed components for atmospheric transport modeling.
+        </p>
+        <img src="assets/architecture.png" alt="TopoFlow Architecture" class="arch-image">
+        <p class="arch-caption">
+            <span class="fig-number">Figure 1.</span>
+            TopoFlow architecture: Wind-guided patch reordering with sector-based estimation,
+            elevation-aware attention bias (&alpha; parameter), variable-specific patch embedding, and multi-pollutant prediction heads.
+        </p>
+    </div>
+</section>
+
+<!-- ═══════════════════════ METHOD ═══════════════════════ -->
+<section class="features" id="method">
+    <div class="container">
+        <p class="section-label">Methodology</p>
+        <h2 class="section-title">Key Innovations</h2>
+        <p class="section-subtitle">
+            Two physics-informed inductive biases for atmospheric transport modeling,
+            integrated into a pre-trained ClimaX backbone.
+        </p>
+
+        <div class="method-grid">
+            <!-- Wind-Following -->
+            <div class="method-card">
+                <h3>
+                    <div class="method-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                    </div>
+                    Wind-Following Patch Reordering
+                </h3>
+                <p>
+                    Standard ViTs process patches in raster-scan order, which is agnostic to physical transport.
+                    TopoFlow reorders patches from <strong>upwind to downwind</strong> using 16 pre-computed wind sectors,
+                    creating an inductive bias aligned with atmospheric advection.
+                </p>
+                <div class="math-block">
+                    $\pi_k^{(s)} = \cos(\theta_s) \cdot \frac{c_k}{W-1} - \sin(\theta_s) \cdot \frac{r_k}{H-1}$
+                </div>
+                <p>
+                    Patches are sorted by ascending projection $\pi_k^{(s)}$ along the dominant wind direction $\theta_s$.
+                    The wind direction is computed from magnitude-weighted averaging of $(u, v)$ wind components.
+                </p>
+            </div>
+
+            <!-- Elevation Bias -->
+            <div class="method-card">
+                <h3>
+                    <div class="method-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
+                    </div>
+                    Alpha Elevation Bias
+                </h3>
+                <p>
+                    The first transformer block (Block 0) incorporates a <strong>learnable elevation bias</strong> that
+                    penalizes attention between patches when the destination patch is at higher elevation,
+                    encoding topographic barriers.
+                </p>
+                <div class="math-block">
+                    $\mathbf{B}_{\text{elev}}[i,j] = -\alpha \cdot \text{ReLU}\!\left(\frac{z_j - z_i}{z_0}\right)$
+                </div>
+                <p>
+                    The learnable parameter $\alpha$ (initialized at 2.0) controls topographic resistance strength.
+                    $z_0 = 1000$ m is a normalization constant. ReLU ensures only uphill transport is penalized.
+                </p>
+            </div>
+
+            <!-- Relative Position Bias -->
+            <div class="method-card">
+                <h3>
+                    <div class="method-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    </div>
+                    Relative 2D Position Bias
+                </h3>
+                <p>
+                    Following T5-style bucketing, relative spatial positions are discretized into 32 &times; 32 buckets
+                    with logarithmic binning. This reduces memory from $\mathcal{O}(N^2)$ to $\mathcal{O}(M^2)$
+                    learnable parameters while encoding spatial proximity.
+                </p>
+                <div class="math-block">
+                    $\mathbf{A} = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_h}} + \mathbf{B}_{\text{pos}} + \mathbf{B}_{\text{elev}}\right)$
+                </div>
+                <p>
+                    The final attention scores combine raw dot-product similarity, position bias, and elevation bias before softmax.
+                </p>
+            </div>
+
+            <!-- Multi-pollutant -->
+            <div class="method-card">
+                <h3>
+                    <div class="method-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                    </div>
+                    Multi-Pollutant Forecasting
+                </h3>
+                <p>
+                    Each of 15 input variables is embedded independently via variable-specific Conv2D projections,
+                    then aggregated through cross-attention. A 2-layer MLP decoder predicts 6 pollutants &times; 4 horizons
+                    simultaneously from a single forward pass.
+                </p>
+                <div class="math-block">
+                    $\hat{\mathbf{Y}} \in \mathbb{R}^{B \times 6 \times 128 \times 256}$
+                </div>
+                <p>
+                    Training uses MSE loss with geographic masking restricted to mainland China and Taiwan (~45% of the grid).
+                </p>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">147M</div>
+                <div class="stat-label">Parameters</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">6</div>
+                <div class="stat-label">Pollutants</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">4</div>
+                <div class="stat-label">Forecast Horizons</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">128</div>
+                <div class="stat-label">GPUs (MI250X)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">0.25&deg;</div>
+                <div class="stat-label">Resolution</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ RESULTS ═══════════════════════ -->
+<section class="results" id="results">
+    <div class="container">
+        <p class="section-label">Evaluation</p>
+        <h2 class="section-title">Results &amp; Case Studies</h2>
+        <p class="section-subtitle">
+            TopoFlow validated across extreme pollution events, seasonal patterns, and multi-model comparisons
+            on the 2018 test set and independent OpenAQ station data.
+        </p>
+
+        <div class="results-grid">
+
+            <!-- TopoFlow Prediction Animation with pollutant selector -->
+            <div class="case-study" id="animation-section">
+                <img id="pollutant-gif" src="assets/figures/animation_pm25.gif" alt="TopoFlow vs CAQRA Animation">
+                <div class="case-study-content">
+                    <span class="case-study-tag">Animated Predictions</span>
+                    <h3>TopoFlow Predictions vs CAQRA Ground Truth</h3>
+                    <p style="margin-bottom: 16px;">
+                        Side-by-side animation of TopoFlow 12h forecasts compared to CAQRA reanalysis
+                        across the 2018 test set. Select a pollutant to see spatial pattern evolution.
+                    </p>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="pollutant-btn active" data-pol="pm25" onclick="switchPollutant('pm25', this)">PM<sub>2.5</sub></button>
+                        <button class="pollutant-btn" data-pol="pm10" onclick="switchPollutant('pm10', this)">PM<sub>10</sub></button>
+                        <button class="pollutant-btn" data-pol="so2" onclick="switchPollutant('so2', this)">SO<sub>2</sub></button>
+                        <button class="pollutant-btn" data-pol="no2" onclick="switchPollutant('no2', this)">NO<sub>2</sub></button>
+                        <button class="pollutant-btn" data-pol="co" onclick="switchPollutant('co', this)">CO</button>
+                        <button class="pollutant-btn" data-pol="o3" onclick="switchPollutant('o3', this)">O<sub>3</sub></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PM2.5 China Map -->
+            <div class="case-study">
+                <img src="assets/figures/china_pm25_publication.png" alt="China PM2.5 Publication Map">
+                <div class="case-study-content">
+                    <span class="case-study-tag">Overview</span>
+                    <h3>PM<sub>2.5</sub> Distribution over China</h3>
+                    <p>
+                        Annual mean PM<sub>2.5</sub> concentrations across the study domain, highlighting the
+                        North China Plain, Sichuan Basin, and Yangtze River Delta as major pollution hotspots.
+                        The 128 &times; 256 grid at 0.25&deg; resolution covers mainland China and Taiwan.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Seasonal Comparison -->
+            <div class="case-study">
+                <img src="assets/figures/figure_seasonal_final.png" alt="Seasonal Multi-Model Comparison">
+                <div class="case-study-content">
+                    <span class="case-study-tag">Multi-Model Comparison</span>
+                    <h3>Seasonal Validation: CAMS vs Aurora vs CAQRA vs TopoFlow vs OpenAQ</h3>
+                    <p>
+                        PM<sub>2.5</sub> spatial distribution across Winter (Jan 15), Spring (Mar 1), Summer (Jul 12),
+                        and Autumn (Oct 19) 2019. Five rows compare CAMS global forecasts, Microsoft Aurora,
+                        CAQRA reanalysis (ground truth), TopoFlow predictions, and independent OpenAQ station measurements.
+                        TopoFlow captures fine-scale spatial structure absent from CAMS global forecasts and
+                        better resolves seasonal patterns than Aurora.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Two column: Beijing Haze + Sichuan -->
+            <div class="two-col">
+                <!-- Beijing Haze -->
+                <div class="case-study">
+                    <img src="assets/figures/figure6_beijing_haze_v5.png" alt="Beijing Haze Back-Trajectory">
+                    <div class="case-study-content">
+                        <span class="case-study-tag">Case Study</span>
+                        <h3>Beijing Haze Episode (Nov 2018)</h3>
+                        <p>
+                            Back-trajectory analysis of a major trans-boundary pollution event.
+                            PM<sub>2.5</sub> snapshots from Nov 8&ndash;16 show the plume building from
+                            Central China and converging on Beijing, reaching &gt;200 &mu;g/m<sup>3</sup>.
+                            TopoFlow captures the temporal evolution and spatial extent of the event.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Sichuan Topographic Blocking -->
+                <div class="case-study">
+                    <img src="assets/figures/figure_sichuan_blocking.png" alt="Sichuan Basin Topographic Blocking">
+                    <div class="case-study-content">
+                        <span class="case-study-tag">Topographic Blocking</span>
+                        <h3>Sichuan Basin Case Study</h3>
+                        <p>
+                            Topographic blocking effect in the Sichuan Basin (Jul 2018). The Tibetan Plateau
+                            acts as a barrier, trapping pollutants in the basin. TopoFlow's elevation bias
+                            captures this mechanism &mdash; the transect at 30&deg;N shows PM<sub>2.5</sub>
+                            accumulation matching observed patterns, unlike ClimaX which smooths across the barrier.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3D Visualization -->
+            <div class="case-study">
+                <img src="assets/figures/3DDD.png" alt="3D PM2.5 Surface with OpenAQ Stations" style="max-height: 500px; object-fit: contain; background: white;">
+                <div class="case-study-content">
+                    <span class="case-study-tag">3D Visualization</span>
+                    <h3>PM<sub>2.5</sub> Prediction Surface with OpenAQ Station Validation</h3>
+                    <p>
+                        Three-dimensional visualization of TopoFlow's predicted PM<sub>2.5</sub> surface
+                        over the Sichuan Basin region, with independent OpenAQ station measurements overlaid
+                        as red markers. The surface captures the spatial gradient from elevated concentrations
+                        in the basin interior (trapped by topography) to lower values at the plateau edges.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ EQUATIONS ═══════════════════════ -->
+<section class="equations" id="equations">
+    <div class="container">
+        <p class="section-label">Mathematical Framework</p>
+        <h2 class="section-title">Core Equations</h2>
+        <p class="section-subtitle">
+            The mathematical formulation of TopoFlow's physics-informed attention mechanism.
+        </p>
+
+        <div class="eq-grid">
+            <div class="eq-card">
+                <h3>TopoFlow Attention (Block 0)</h3>
+                <p>The first transformer block augments standard attention with position and elevation biases:</p>
+                $$\mathbf{A} = \text{softmax}\!\left(\frac{\mathbf{QK}^\top}{\sqrt{d_h}} + \mathbf{B}_{\text{pos}} + \mathbf{B}_{\text{elev}}\right)$$
+            </div>
+            <div class="eq-card">
+                <h3>Elevation Barrier Bias</h3>
+                <p>Penalizes uphill pollutant transport across topographic barriers:</p>
+                $$\mathbf{B}_{\text{elev}}[i,j] = -\alpha \cdot \text{ReLU}\!\left(\frac{z_j - z_i}{1000}\right)$$
+            </div>
+            <div class="eq-card">
+                <h3>Wind Direction Estimation</h3>
+                <p>Magnitude-weighted average of horizontal wind components:</p>
+                $$\theta_{\text{wind}} = \arctan2\!\left(\frac{\sum u \cdot w}{\sum w},\; \frac{\sum v \cdot w}{\sum w}\right)$$
+            </div>
+            <div class="eq-card">
+                <h3>Geographic Loss Function</h3>
+                <p>MSE computed only over valid China + Taiwan regions:</p>
+                $$\mathcal{L} = \frac{1}{\|\mathbf{M}\|_1} \sum_{v,i,j} \mathbf{M}_{ij} \cdot (\hat{Y}_{v,i,j} - Y_{v,i,j})^2$$
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ SPECIFICATIONS ═══════════════════════ -->
+<section class="specs" id="specs">
+    <div class="container">
+        <p class="section-label">Technical Details</p>
+        <h2 class="section-title">Model Specifications</h2>
+        <p class="section-subtitle">
+            Complete technical specifications of the TopoFlow architecture and training configuration.
+        </p>
+
+        <div class="specs-table">
+            <table>
+                <thead>
+                    <tr><th>Component</th><th>Specification</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Input Resolution</td><td>128 &times; 256 (0.25&deg; grid)</td></tr>
+                    <tr><td>Patch Size</td><td>2 &times; 2 pixels (8,192 patches)</td></tr>
+                    <tr><td>Embedding Dimension</td><td>768</td></tr>
+                    <tr><td>Transformer Depth</td><td>6 blocks (1 TopoFlow + 5 standard ViT)</td></tr>
+                    <tr><td>Attention Heads</td><td>8 (per-head dim = 96)</td></tr>
+                    <tr><td>MLP Ratio</td><td>4.0 (hidden dim = 3,072)</td></tr>
+                    <tr><td>Total Parameters</td><td>~147M</td></tr>
+                    <tr><td>Input Variables</td><td>15 (5 meteo + 6 pollutants + 2 coords + 2 static)</td></tr>
+                    <tr><td>Output Variables</td><td>6 pollutants (PM<sub>2.5</sub>, PM<sub>10</sub>, SO<sub>2</sub>, NO<sub>2</sub>, CO, O<sub>3</sub>)</td></tr>
+                    <tr><td>Forecast Horizons</td><td>12h, 24h, 48h, 96h</td></tr>
+                    <tr><td>Wind Sectors</td><td>16 pre-computed orderings (22.5&deg; each)</td></tr>
+                    <tr><td>Position Bias Buckets</td><td>32 &times; 32 = 1,024 per head</td></tr>
+                    <tr><td>&alpha; Initialization</td><td>2.0 (learnable, converges to ~1.0)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="height: 48px;"></div>
+
+        <div class="specs-table">
+            <table>
+                <thead>
+                    <tr><th>Training Parameter</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Optimizer</td><td>AdamW (weight decay = 0.01)</td></tr>
+                    <tr><td>Base Learning Rate</td><td>1 &times; 10<sup>-4</sup> (cosine annealing + 2k warmup)</td></tr>
+                    <tr><td>Effective Batch Size</td><td>512 (128 GPUs &times; 2 &times; 2 grad accum)</td></tr>
+                    <tr><td>Training Data</td><td>2013&ndash;2016 (CAQRA)</td></tr>
+                    <tr><td>Validation</td><td>2017</td></tr>
+                    <tr><td>Test Set</td><td>2018</td></tr>
+                    <tr><td>Epochs</td><td>60</td></tr>
+                    <tr><td>Infrastructure</td><td>128 AMD MI250X GPUs (16 LUMI-G nodes)</td></tr>
+                    <tr><td>Framework</td><td>PyTorch Lightning + DDP</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ QUICK START ═══════════════════════ -->
+<section class="code-section" id="quickstart">
+    <div class="container">
+        <p class="section-label">Getting Started</p>
+        <h2 class="section-title">Quick Start</h2>
+        <p class="section-subtitle">
+            Install TopoFlow and run inference in a few lines of code.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <div class="code-dot red"></div>
+                <div class="code-dot yellow"></div>
+                <div class="code-dot green"></div>
+                <span class="code-title">train.py</span>
+            </div>
+            <div class="code-content">
+<span class="comment"># Install</span>
+pip install git+https://github.com/AmmarKheder/TopoFlow.git
+
+<span class="comment"># Import</span>
+<span class="keyword">from</span> topoflow <span class="keyword">import</span> TopoFlowModel, TopoFlowDataModule
+
+<span class="comment"># Initialize model</span>
+model = <span class="function">TopoFlowModel</span>(
+    variables=[<span class="string">"u"</span>, <span class="string">"v"</span>, <span class="string">"temp"</span>, <span class="string">"rh"</span>, <span class="string">"psfc"</span>,
+               <span class="string">"pm25"</span>, <span class="string">"pm10"</span>, <span class="string">"so2"</span>, <span class="string">"no2"</span>, <span class="string">"co"</span>, <span class="string">"o3"</span>,
+               <span class="string">"lat2d"</span>, <span class="string">"lon2d"</span>, <span class="string">"elevation"</span>, <span class="string">"population"</span>],
+    img_size=(<span class="number">128</span>, <span class="number">256</span>),
+    embed_dim=<span class="number">768</span>,
+    depth=<span class="number">6</span>,
+    num_heads=<span class="number">8</span>,
+    parallel_patch_embed=<span class="keyword">True</span>,   <span class="comment"># wind-following</span>
+    use_physics_mask=<span class="keyword">True</span>,       <span class="comment"># elevation bias</span>
+)
+
+<span class="comment"># Run inference</span>
+predictions = model(x, lead_times=[<span class="number">12</span>, <span class="number">24</span>, <span class="number">48</span>, <span class="number">96</span>])
+<span class="comment"># Output: [B, 6, 128, 256] per horizon</span>
+            </div>
+        </div>
+
+        <div style="height: 48px;"></div>
+
+        <div class="code-block">
+            <div class="code-header">
+                <div class="code-dot red"></div>
+                <div class="code-dot yellow"></div>
+                <div class="code-dot green"></div>
+                <span class="code-title">submit_train.sh</span>
+            </div>
+            <div class="code-content">
+<span class="comment">#!/bin/bash</span>
+<span class="comment">#SBATCH --nodes=16 --gpus-per-node=8 --time=48:00:00</span>
+<span class="comment"># Distributed training on LUMI-G (128 AMD MI250X GPUs)</span>
+
+srun python scripts/train.py \
+    --config configs/default.yaml \
+    --data.train_years <span class="number">2013</span> <span class="number">2014</span> <span class="number">2015</span> <span class="number">2016</span> \
+    --data.val_years <span class="number">2017</span> \
+    --model.embed_dim <span class="number">768</span> \
+    --model.depth <span class="number">6</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ CITATION ═══════════════════════ -->
+<section style="background: var(--light); padding: 80px 0;" id="citation">
+    <div class="container">
+        <p class="section-label">Reference</p>
+        <h2 class="section-title">Citation</h2>
+        <div class="code-block" style="max-width: 700px; margin: 32px auto 0;">
+            <div class="code-header">
+                <div class="code-dot red"></div>
+                <div class="code-dot yellow"></div>
+                <div class="code-dot green"></div>
+                <span class="code-title">citation.bib</span>
+            </div>
+            <div class="code-content" style="font-size: 0.82rem;">
+@article{kheder2025topoflow,
+  title   = {TopoFlow: Physics-Informed Deep Learning
+             for Multi-Pollutant Air Quality Forecasting},
+  author  = {Kheder, Ammar},
+  year    = {2026},
+  note    = {Under review}
+}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer>
+    <div class="container">
+        <p style="margin-bottom: 8px;">
+            <strong>TopoFlow</strong> &mdash; Physics-Informed Air Quality Forecasting
+        </p>
+        <p>
+            MIT License &middot;
+            <a href="https://github.com/AmmarKheder/TopoFlow">GitHub</a>
+        </p>
+        <p style="margin-top: 12px; font-size: 0.85rem; color: var(--gray-light);">
+            Created by Ammar Kheder &middot; Trained on LUMI supercomputer
+        </p>
+    </div>
+</footer>
+
+<script>
+function switchPollutant(pol, btn) {
+    document.getElementById('pollutant-gif').src = 'assets/figures/animation_' + pol + '.gif';
+    document.querySelectorAll('.pollutant-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+</script>
+
+</body>
+</html>
