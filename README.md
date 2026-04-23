@@ -1,17 +1,88 @@
 # TopoFlow
 
-A physics-informed deep learning model for multi-pollutant air quality forecasting.
+<div align="center">
 
-**Project page:** [https://ammarkheder.github.io/TopoFlow/](https://ammarkheder.github.io/TopoFlow/)
+# 🌬️ TopoFlow
 
-## Overview
+### *Topography-aware Pollutant Flow Learning for High-Resolution Air Quality Prediction*
 
-TopoFlow combines Vision Transformer architecture with physics-based inductive biases for atmospheric transport modeling:
+[![Paper](https://img.shields.io/badge/Published-npj%20Climate%20%26%20Atmospheric%20Science-0B6E99?style=for-the-badge&logo=nature&logoColor=white)](https://doi.org/10.1038/s41612-026-01417-5)
+[![DOI](https://img.shields.io/badge/DOI-10.1038%2Fs41612--026--01417--5-005C99?style=for-the-badge)](https://doi.org/10.1038/s41612-026-01417-5)
+[![arXiv](https://img.shields.io/badge/arXiv-2602.16821-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2602.16821)
+[![Project Page](https://img.shields.io/badge/🌐_Project_Page-TopoFlow-4A5FD8?style=for-the-badge)](https://ammarkheder.github.io/TopoFlow/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-- **Wind-following patch scanning**: Reorders spatial patches according to wind direction (upwind → downwind) to capture atmospheric transport
-- **Elevation-aware attention**: Learnable topographic barrier modeling in transformer attention
-- **Multi-horizon prediction**: Forecasts at 12h, 24h, 48h, and 96h lead times
-- **Multi-pollutant support**: PM2.5, PM10, SO2, NO2, CO, O3
+---
+
+> 🎉 **Published in *npj Climate and Atmospheric Science* (Nature Portfolio)**
+> **DOI:** [10.1038/s41612-026-01417-5](https://doi.org/10.1038/s41612-026-01417-5)
+
+</div>
+
+## ✨ Overview
+
+**TopoFlow** fuses **Vision Transformer** architectures with **physics-based inductive biases** to model atmospheric transport of pollutants — turning raw meteorological and terrain data into precise, high-resolution air quality forecasts.
+
+Where pure data-driven models ignore the physics of how air actually flows over mountains and valleys, TopoFlow *listens to the landscape*.
+
+---
+
+## 🧠 Core Innovations
+
+### 🌪️ Wind-Following Patch Scanning
+Reorders spatial patches along the wind direction (*upwind → downwind*), letting the transformer naturally capture the flow of pollutants across a region.
+
+### 🏔️ Elevation-Aware Attention
+A learnable **topographic barrier mechanism** inside the attention layers — mountains block flow, valleys channel it, and the model knows the difference.
+
+### ⏱️ Multi-Horizon Forecasting
+One unified model, four forecast horizons:
+`12h` · `24h` · `48h` · `96h`
+
+### 🧪 Multi-Pollutant Coverage
+`PM₂.₅` · `PM₁₀` · `SO₂` · `NO₂` · `CO` · `O₃`
+
+---
+
+## 📊 At a Glance
+
+| | |
+|---|---|
+| **Architecture** | Vision Transformer + physics priors |
+| **Inputs** | Meteorology, elevation, emissions |
+| **Outputs** | 6 pollutants × 4 horizons |
+| **Domain** | High-resolution regional air quality |
+
+---
+
+## 📚 Citation
+
+```bibtex
+@article{kheder2026topoflow,
+  title   = {TopoFlow: Topography-aware Pollutant Flow Learning for High-Resolution Air Quality Prediction},
+  author  = {Kheder, Ammar and others},
+  journal = {npj Climate and Atmospheric Science},
+  year    = {2026},
+  doi     = {10.1038/s41612-026-01417-5},
+  url     = {https://doi.org/10.1038/s41612-026-01417-5}
+}
+```
+
+---
+
+## 🔗 Links
+
+- 📄 **Paper (npj Climate & Atmospheric Science):** https://doi.org/10.1038/s41612-026-01417-5
+- 📝 **arXiv preprint:** https://arxiv.org/abs/2602.16821
+- 🌐 **Project page:** https://ammarkheder.github.io/TopoFlow/
+
+---
+
+<div align="center">
+
+*Bringing physics back into transformers — one wind vector at a time.*
+
+</div>
 
 ## Installation
 
@@ -142,13 +213,7 @@ srun python scripts/train.py \
     --config configs/default.yaml
 ```
 
-## Citation
 
-```bibtex
-@article{topoflow2026,
-  title={TopoFlow: Physics-Informed Deep Learning for Air Quality Forecasting},
-  author={Kheder, Ammar},
-  year={2026}
 }
 ```
 
