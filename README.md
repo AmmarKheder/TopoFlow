@@ -60,7 +60,7 @@ One unified model, four forecast horizons:
 ```bibtex
 @article{kheder2026topoflow,
   title   = {TopoFlow: Topography-aware Pollutant Flow Learning for High-Resolution Air Quality Prediction},
-  author  = {Kheder, Ammar and others},
+  author  = {Kheder, Ammar and Toropainen, Helmi and Peng, Wenqing and Ant{\~a}o, Samuel and Chen, Jia and Boy, Michael and Liu, Zhi-Song},
   journal = {npj Climate and Atmospheric Science},
   year    = {2026},
   doi     = {10.1038/s41612-026-01417-5},
